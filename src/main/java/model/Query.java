@@ -60,7 +60,7 @@ public class Query {
      */
     private static Connection openConnectionFromDbConn() throws SQLException, IOException {
         Properties configProps = new Properties();
-        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:connections/dbconn.properties")));
+        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/dbconn.properties")));
 
         String endpoint = configProps.getProperty("RDS_ENDPOINT");
         String port = configProps.getProperty("RDS_PORT");

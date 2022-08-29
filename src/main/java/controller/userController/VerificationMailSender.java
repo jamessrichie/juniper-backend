@@ -17,19 +17,19 @@ public class VerificationMailSender {
 
     public VerificationMailSender() throws IOException {
         Properties configProps = new Properties();
-        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:connections/smtp.properties")));
+        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/smtp.properties")));
 
         mailSender = new JavaMailSenderImpl();
-		mailSender.setHost(configProps.getProperty("SMTP_HOST"));
-		mailSender.setPort(parseInt(configProps.getProperty("SMTP_PORT")));
-		mailSender.setUsername(configProps.getProperty("SMTP_ADDRESS"));
-		mailSender.setPassword(configProps.getProperty("SMTP_PASSWORD"));
+        mailSender.setHost(configProps.getProperty("SMTP_HOST"));
+        mailSender.setPort(parseInt(configProps.getProperty("SMTP_PORT")));
+        mailSender.setUsername(configProps.getProperty("SMTP_ADDRESS"));
+        mailSender.setPassword(configProps.getProperty("SMTP_PASSWORD"));
 
         Properties props = mailSender.getJavaMailProperties();
-		props.put("mail.transport.protocol", "smtp");
-		props.put("mail.smtp.auth", "true");
-		props.put("mail.smtp.starttls.enable", "true");
-		props.put("mail.debug", "true");
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.debug", "true");
         props.put("mail.smtp.allow8bitmime", "true");
         props.put("mail.smtps.allow8bitmime", "true");
     }
