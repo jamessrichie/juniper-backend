@@ -38,10 +38,8 @@ public class UserController {
     /**
      * Creates a new user account
      *
-     * TODO: ensure that the userHandle generated is unique. otherwise, generate a new 4 digit number
-     *
-     * @url .../user/createUser?name=value1&email=value2&password=value3
      * @return HTTP status code with message
+     * @url .../user/createUser?name=value1&email=value2&password=value3
      */
     @PostMapping("/createUser")
     public ResponseEntity<String> createUser(@RequestParam(value = "name") String name,
@@ -51,18 +49,23 @@ public class UserController {
         name = WordUtils.capitalizeFully(name);
         email = email.toLowerCase();
 
-        String userID = UUID.randomUUID().toString();
-        String userHandle = name.replaceAll("\\s","").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
+        String userId = UUID.randomUUID().toString();
+        String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
+
+        // check that user handle is unique
+        while (database.transaction_userHandleToUserIdResolution(userHandle).getBody() != null) {
+            userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
+        }
+
         byte[] salt = get_salt();
         byte[] hash = get_hash(password, salt);
         String verificationCode = generateVerificationCode(64);
 
         // creates the user
-        ResponseEntity<String> createUserStatus = database.transaction_createUser(userID, userHandle, name, email, salt, hash, verificationCode);
+        ResponseEntity<Boolean> createUserStatus = database.transaction_createUser(userId, userHandle, name, email, salt, hash, verificationCode);
         if (createUserStatus.getStatusCode() != HttpStatus.OK) {
-            return createUserStatus;
+            return new ResponseEntity<>("Failed to create user\n", createUserStatus.getStatusCode());
         }
-
         // on success, send verification email
         return mailSender.sendVerificationEmail(name, email, verificationCode);
     }
@@ -70,8 +73,8 @@ public class UserController {
     /**
      * Sends a verification email
      *
-     * @url .../user/sendVerificationEmail?email=value1
      * @return HTTP status code with message
+     * @url .../user/sendVerificationEmail?email=value1
      */
     @PostMapping("/sendVerificationEmail")
     public ResponseEntity<String> sendVerificationEmail(@RequestParam(value = "email") String email) {
@@ -100,26 +103,32 @@ public class UserController {
     /**
      * Verifies a user and redirects them to the login page
      *
-     * @url .../user/verify?code=value1
      * @return HTTP status code with message
+     * @url .../user/verify?code=value1
      */
     @GetMapping("/verifyUser")
     public ResponseEntity<String> verifyUser(@RequestParam(value = "code") String verificationCode) {
 
-        ResponseEntity<String> verifyUserStatus = database.transaction_verifyUser(verificationCode);
-        return verifyUserStatus;
+        ResponseEntity<Boolean> verifyUserStatus = database.transaction_verifyUser(verificationCode);
+
+        return switch (verifyUserStatus.getStatusCode()) {
+            case OK -> new ResponseEntity<>("Successfully verified user\n", HttpStatus.OK);
+            case BAD_REQUEST -> new ResponseEntity<>("User already verified\n", HttpStatus.BAD_REQUEST);
+            case GONE -> new ResponseEntity<>("Verification code has expired\n", HttpStatus.GONE);
+            default -> new ResponseEntity<>("Failed to verify user\n", verifyUserStatus.getStatusCode());
+        };
     }
 
     /**
      * Updates the login credentials of an existing user account
      *
-     * @url .../user/updateUserCredentials?userID=value1&password=value2&newPassword=value3
      * @return
+     * @url .../user/updateUserCredentials?userId=value1&password=value2&newPassword=value3
      */
     @PostMapping("/updateUserCredentials")
     public Boolean updateUserCredentials(@RequestParam(value = "email") String email,
                                          @RequestParam(value = "new_email") String newEmail,
-                                          @RequestParam(value = "password") String password,
+                                         @RequestParam(value = "password") String password,
                                          @RequestParam(value = "new_password") String newPassword) {
 
         throw new NotYetImplementedException();
@@ -128,17 +137,17 @@ public class UserController {
     /**
      * Records changes to the user's profile
      *
-     * @effect HTTP POST Request updates the model/database
      * @return true iff operation succeeds
+     * @effect HTTP POST Request updates the model/database
      */
     @PostMapping(value = "/updateUserProfile", consumes = "application/json", produces = "application/json")
     public String updateUserProfile(@RequestBody String user, @RequestParam(value = "access_token") String accessToken) {
 
         // Overview
-         // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
-         // assert that userID and password matches those stored
-         // in the database before updating the associated profile
-         // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
+        // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
+        // assert that userId and password matches those stored
+        // in the database before updating the associated profile
+        // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
 
         throw new NotYetImplementedException();
     }
@@ -159,7 +168,7 @@ public class UserController {
      * Generates a cryptographic hash
      *
      * @param password password to be hashed
-     * @param salt salt for the has
+     * @param salt     salt for the has
      * @return cryptographic hash
      */
     private byte[] get_hash(String password, byte[] salt) {

@@ -1,7 +1,7 @@
 CREATE TABLE tbl_universities
 (
-    university_id varchar(36)  NOT NULL,
-    name          varchar(256) NOT NULL,
+    university_id   varchar(36)  NOT NULL,
+    university_name varchar(256) NOT NULL,
 
     PRIMARY KEY (university_id)
 
@@ -23,7 +23,7 @@ CREATE TABLE tbl_users
 (
     user_id                varchar(36)   NOT NULL,
     user_handle            varchar(261)  NOT NULL,
-    name                   varchar(256)  NOT NULL,
+    user_name              varchar(256)  NOT NULL,
     email                  varchar(256)  NOT NULL,
     salt                   varbinary(16) NOT NULL,
     hash                   varbinary(20) NOT NULL,
