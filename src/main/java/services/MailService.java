@@ -6,11 +6,12 @@ import static java.lang.Integer.*;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
-import org.jsoup.Jsoup;
 import org.springframework.http.*;
 import org.springframework.mail.javamail.*;
 import org.springframework.util.ResourceUtils;
 import static org.apache.commons.lang3.StringUtils.*;
+
+import helpers.Utilities;
 
 public class MailService {
 
@@ -63,7 +64,7 @@ public class MailService {
     public ResponseEntity<String> sendVerificationEmail(String name, String toAddress, String verificationCode) {
         try {
             String subject = "Please verify your email";
-            String content = Jsoup.parse(ResourceUtils.getFile("classpath:templates/verification_email.html"), "UTF-8").toString();
+            String content = Utilities.loadTemplate("verification_email.html");
             String verificationUrl = apiHost + "/user/verifyEmail?code=" + verificationCode;
 
             content = content.replace("[[name]]", substringBefore(name, " "));

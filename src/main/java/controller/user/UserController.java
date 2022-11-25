@@ -9,6 +9,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import model.*;
+import helpers.*;
 import services.*;
 import exceptions.*;
 
@@ -105,10 +106,21 @@ public class UserController {
         ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(verificationCode);
 
         return switch (verifyEmailStatus.getStatusCode()) {
-            case OK -> new ResponseEntity<>("Successfully verified user\n", HttpStatus.OK);
-            case BAD_REQUEST -> new ResponseEntity<>("User already verified\n", HttpStatus.BAD_REQUEST);
-            case GONE -> new ResponseEntity<>("Verification code has expired\n", HttpStatus.GONE);
-            default -> new ResponseEntity<>("Failed to verify user\n", verifyEmailStatus.getStatusCode());
+            case OK -> new ResponseEntity<>(
+                    Utilities.loadTemplate("verification_success.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    HttpStatus.OK);
+
+            case BAD_REQUEST -> new ResponseEntity<>(
+                    Utilities.loadTemplate("verification_already.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    HttpStatus.BAD_REQUEST);
+
+            case GONE -> new ResponseEntity<>(
+                    Utilities.loadTemplate("verification_expired.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    HttpStatus.GONE);
+
+            default -> new ResponseEntity<>(
+                    Utilities.loadTemplate("verification_failed.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    verifyEmailStatus.getStatusCode());
         };
     }
 
