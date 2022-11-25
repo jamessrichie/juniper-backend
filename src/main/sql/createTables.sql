@@ -27,6 +27,9 @@ CREATE TABLE tbl_users
     email                  varchar(256)  NOT NULL,
     salt                   varbinary(16) NOT NULL,
     hash                   varbinary(20) NOT NULL,
+    refresh_token_id       varchar(36),
+    refresh_token_family   varchar(36),
+    profile_picture        varchar(512),
     verification_code      varchar(64)   NOT NULL,
     verification_timestamp datetime      NOT NULL,
     has_verified_email     boolean       NOT NULL,
@@ -46,8 +49,8 @@ CREATE TABLE tbl_users
 
     PRIMARY KEY (user_id),
     FOREIGN KEY (university_id) REFERENCES tbl_universities (university_id) ON UPDATE CASCADE ON DELETE RESTRICT,
-    UNIQUE (email),
     UNIQUE (user_handle),
+    UNIQUE (email),
     UNIQUE (verification_code)
 
 ) ENGINE = INNODB;
@@ -61,7 +64,6 @@ CREATE TABLE tbl_registration
 
     PRIMARY KEY (user_id, course_id, university_id),
     FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
-    FOREIGN KEY (course_id) REFERENCES tbl_courses (course_id) ON UPDATE CASCADE ON DELETE CASCADE,
     FOREIGN KEY (university_id) REFERENCES tbl_courses (university_id) ON UPDATE CASCADE ON DELETE CASCADE
 
 ) ENGINE = INNODB;
@@ -69,8 +71,9 @@ CREATE TABLE tbl_registration
 
 CREATE TABLE tbl_media
 (
-    url     varchar(512) NOT NULL,
-    user_id varchar(36)  NOT NULL,
+    url      varchar(512) NOT NULL,
+    ordering int          NOT NULL,
+    user_id  varchar(36)  NOT NULL,
 
     PRIMARY KEY (url),
     FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE
