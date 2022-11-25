@@ -15,7 +15,6 @@ import static org.apache.commons.lang3.StringUtils.*;
 public class MailService {
 
     private final String apiHost;
-    private final String apiBaseUrl;
     private final JavaMailSenderImpl mailSender;
 
     public MailService() throws IOException {
@@ -24,7 +23,6 @@ public class MailService {
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/smtp.credentials")));
 
         apiHost = configProps.getProperty("API_HOST");
-        apiBaseUrl = configProps.getProperty("API_BASE_URL");
 
         mailSender = new JavaMailSenderImpl();
         mailSender.setHost(configProps.getProperty("SMTP_HOST"));
@@ -66,7 +64,7 @@ public class MailService {
         try {
             String subject = "Please verify your email";
             String content = Jsoup.parse(ResourceUtils.getFile("classpath:templates/verification_email.html"), "UTF-8").toString();
-            String verificationUrl = apiHost + apiBaseUrl + "/user/verifyEmail?code=" + verificationCode;
+            String verificationUrl = apiHost + "/user/verifyEmail?code=" + verificationCode;
 
             content = content.replace("[[name]]", substringBefore(name, " "));
             content = content.replace("[[url]]", verificationUrl);

@@ -13,7 +13,7 @@ import services.*;
 import exceptions.*;
 
 @RestController
-@RequestMapping("/v0/user")
+@RequestMapping("/user")
 public class UserController {
 
     // Database connection

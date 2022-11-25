@@ -11,7 +11,7 @@ import exceptions.*;
 import services.AuthTokenService;
 
 @RestController
-@RequestMapping("/v0/auth")
+@RequestMapping("/auth")
 public class AuthController {
 
     // Database connection
