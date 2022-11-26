@@ -17,6 +17,10 @@ import model.DatabaseConnection;
 /**
  * Consult section 1.5 of the following standard for further details <br>
  * <a href="https://www.rfc-editor.org/rfc/rfc6749#section-1.5">The OAuth 2.0 Authorization Framework</a>
+ *
+ * Current implementation of the AuthTokenService does not allow for multiple clients to log into
+ * the same account. Logging into a new client generate a new token family and invalidate previous
+ * refresh tokens. We will pretend that this is a feature, not a bug, à la Snapchat
  */
 public class AuthTokenService {
 
@@ -24,7 +28,6 @@ public class AuthTokenService {
     private final DatabaseConnection dbconn;
 
     private final String apiHost;
-    private final String privateKey;
 
     private final Algorithm HMAC256Algorithm;
     private final JWTVerifier accessTokenVerifier;
@@ -42,7 +45,7 @@ public class AuthTokenService {
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/jwt.credentials")));
 
         apiHost = configProps.getProperty("API_HOST");
-        privateKey = configProps.getProperty("JWT_PRIVATE_KEY");
+        String privateKey = configProps.getProperty("JWT_PRIVATE_KEY");
 
         HMAC256Algorithm = Algorithm.HMAC256(privateKey);
 

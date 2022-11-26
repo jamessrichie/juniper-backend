@@ -31,21 +31,21 @@ public class AuthController {
 
         email = email.toLowerCase();
 
+        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
+        if (getUserIdStatus.getStatusCode() != HttpStatus.OK) {
+            return new ResponseEntity<>("Account does not exist\n", HttpStatus.BAD_REQUEST);
+        }
+        String userId = getUserIdStatus.getBody();
+
         ResponseEntity<Boolean> checkEmailVerificationStatus = dbconn.transaction_checkEmailVerification(email);
         if (Boolean.FALSE.equals(checkEmailVerificationStatus.getBody())) {
-            return new ResponseEntity<>("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>("Please verify your email before logging in\n", HttpStatus.BAD_REQUEST);
         }
 
         ResponseEntity<Boolean> verifyCredentialsStatus = dbconn.transaction_verifyCredentials(email, password);
         if (Boolean.FALSE.equals(verifyCredentialsStatus.getBody())) {
-            return new ResponseEntity<>("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            return new ResponseEntity<>("Incorrect credentials\n", HttpStatus.UNAUTHORIZED);
         }
-
-        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
-        if (getUserIdStatus.getStatusCode() != HttpStatus.OK) {
-            return new ResponseEntity<>("Failed to verify credentials", HttpStatus.BAD_REQUEST);
-        }
-        String userId = getUserIdStatus.getBody();
 
         return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }

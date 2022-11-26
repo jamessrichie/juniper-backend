@@ -46,6 +46,12 @@ public class UserController {
         name = WordUtils.capitalizeFully(name);
         email = email.toLowerCase();
 
+        // check that the email is not in use
+        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
+        if (getUserIdStatus.getStatusCode() == HttpStatus.OK) {
+            return new ResponseEntity<>("Email is already in use\n", HttpStatus.BAD_REQUEST);
+        }
+
         String userId = UUID.randomUUID().toString();
         String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
 
@@ -107,19 +113,23 @@ public class UserController {
 
         return switch (verifyEmailStatus.getStatusCode()) {
             case OK -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification_success.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    Utilities.loadTemplate("verification/verification_success_page.html").replace("[[year]]",
+                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     HttpStatus.OK);
 
             case BAD_REQUEST -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification_already.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    Utilities.loadTemplate("verification/already_verified_page.html").replace("[[year]]",
+                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     HttpStatus.BAD_REQUEST);
 
             case GONE -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification_expired.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    Utilities.loadTemplate("verification/verification_expired_page.html").replace("[[year]]",
+                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     HttpStatus.GONE);
 
             default -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification_failed.html").replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                    Utilities.loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
+                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     verifyEmailStatus.getStatusCode());
         };
     }
