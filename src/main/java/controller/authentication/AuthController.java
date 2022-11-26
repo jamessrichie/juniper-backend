@@ -7,7 +7,6 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import model.*;
-import exceptions.*;
 import services.AuthTokenService;
 
 @RestController
@@ -59,7 +58,7 @@ public class AuthController {
         if (accessAndRefreshTokens != null) {
             return new ResponseEntity<>(accessAndRefreshTokens, HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(null, HttpStatus.UNAUTHORIZED);
+            return new ResponseEntity<>("Refresh token rejected\n", HttpStatus.UNAUTHORIZED);
         }
     }
 }

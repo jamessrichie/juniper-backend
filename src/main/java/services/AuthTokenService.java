@@ -162,8 +162,7 @@ public class AuthTokenService {
     /**
      * Verifies a refresh token
      *
-     * @return if valid, then return an AuthTokens object containing a new
-     * access and refresh token. otherwise return null
+     * @return if valid, then return a new access and refresh token. otherwise return null
      */
     public String verifyRefreshToken(String userId, String token) {
         try {
@@ -171,9 +170,11 @@ public class AuthTokenService {
 
             assert(decodedToken.getSubject().equals(userId));
             assert(decodedToken.getExpiresAtAsInstant().isAfter(Instant.now()));
+            assert(decodedToken.getClaim("token_type").asString().equals("refresh"));
 
             String tokenId = decodedToken.getId();
             String tokenFamily = decodedToken.getClaim("token_family").asString();
+
             ResponseEntity<Boolean> verifyRefreshTokenIdStatus = dbconn.transaction_verifyRefreshTokenId(userId, tokenId);
             ResponseEntity<Boolean> verifyRefreshTokenFamilyStatus = dbconn.transaction_verifyRefreshTokenFamily(userId, tokenFamily);
 

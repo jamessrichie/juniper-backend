@@ -196,6 +196,7 @@ public class AuthTokenServiceTest {
 
         // generate access and refresh tokens from a new token family
         accessAndRefreshTokens = authTokenService.generateAccessAndRefreshTokens("userId");
+        assertNotNull(accessAndRefreshTokens);
         refreshToken = accessAndRefreshTokens.split(",")[1];
 
         // use the new refresh token from second family. verification should succeed

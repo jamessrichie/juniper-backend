@@ -92,7 +92,7 @@ public class UserController {
         // gets the verification code for the user
         ResponseEntity<String> getVerificationCodeStatus = dbconn.transaction_getVerificationCode(email);
         if (getVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
-            return getVerificationCodeStatus;
+            return new ResponseEntity<>("Failed to send email\n", getVerificationCodeStatus.getStatusCode());
         }
         String verificationCode = getVerificationCodeStatus.getBody();
 
