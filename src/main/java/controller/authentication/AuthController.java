@@ -31,12 +31,6 @@ public class AuthController {
 
         email = email.toLowerCase();
 
-        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
-        if (getUserIdStatus.getStatusCode() != HttpStatus.OK) {
-            return new ResponseEntity<>("Account does not exist\n", HttpStatus.BAD_REQUEST);
-        }
-        String userId = getUserIdStatus.getBody();
-
         ResponseEntity<Boolean> checkEmailVerificationStatus = dbconn.transaction_checkEmailVerification(email);
         if (Boolean.FALSE.equals(checkEmailVerificationStatus.getBody())) {
             return new ResponseEntity<>("Please verify your email before logging in\n", HttpStatus.BAD_REQUEST);
@@ -47,23 +41,25 @@ public class AuthController {
             return new ResponseEntity<>("Incorrect credentials\n", HttpStatus.UNAUTHORIZED);
         }
 
+        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
+        if (getUserIdStatus.getStatusCode() != HttpStatus.OK) {
+            return new ResponseEntity<>("Failed to verify credentials\n", HttpStatus.BAD_REQUEST);
+        }
+        String userId = getUserIdStatus.getBody();
+
         return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
 
-    /**
-     * Updates the login credentials of an existing user account
-     *
-     * @return
-     * @url .../user/updateUserCredentials?userId=value1&password=value2&newPassword=value3
-     */
-    @PostMapping("/updateUserCredentials")
-    public Boolean updateUserCredentials(@RequestParam(value = "email") String email,
-                                         @RequestParam(value = "new_email") String newEmail,
-                                         @RequestParam(value = "password") String password,
-                                         @RequestParam(value = "new_password") String newPassword) {
+    @PostMapping("/renew-tokens")
+    public ResponseEntity<String> renewTokens(@RequestParam(value = "user_id") String userId,
+                                              @RequestParam(value = "refresh_token") String refreshToken) {
 
-        throw new NotYetImplementedException();
+        String accessAndRefreshTokens = authTokenService.verifyRefreshToken(userId, refreshToken);
+
+        if (accessAndRefreshTokens != null) {
+            return new ResponseEntity<>(accessAndRefreshTokens, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(null, HttpStatus.UNAUTHORIZED);
+        }
     }
-
-
 }

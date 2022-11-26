@@ -36,9 +36,9 @@ public class UserController {
      * Creates a new user account
      *
      * @return HTTP status code with message
-     * @url .../user/createUser?name=value1&email=value2&password=value3
+     * @url .../user/create?name=value1&email=value2&password=value3
      */
-    @PostMapping("/createUser")
+    @PostMapping("/create")
     public ResponseEntity<String> createUser(@RequestParam(value = "name") String name,
                                              @RequestParam(value = "email") String email,
                                              @RequestParam(value = "password") String password) {
@@ -75,9 +75,9 @@ public class UserController {
      * Sends a verification email
      *
      * @return HTTP status code with message
-     * @url .../user/sendVerificationEmail?email=value1
+     * @url .../user/send-verification-email?email=value1
      */
-    @PostMapping("/sendVerificationEmail")
+    @PostMapping("/send-verification-email")
     public ResponseEntity<String> sendVerificationEmail(@RequestParam(value = "email") String email) {
 
         email = email.toLowerCase();
@@ -106,7 +106,7 @@ public class UserController {
      * @return HTTP status code with message
      * @url .../user/verify?code=value1
      */
-    @GetMapping("/verifyEmail")
+    @GetMapping("/verify")
     public ResponseEntity<String> verifyEmail(@RequestParam(value = "code") String verificationCode) {
 
         ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(verificationCode);
@@ -135,12 +135,27 @@ public class UserController {
     }
 
     /**
+     * Updates the login credentials of an existing user account
+     *
+     * @return
+     * @url .../user/updateUserCredentials?userId=value1&password=value2&newPassword=value3
+     */
+    @PostMapping("/updateUserCredentials")
+    public Boolean updateUserCredentials(@RequestParam(value = "email") String email,
+                                         @RequestParam(value = "new_email") String newEmail,
+                                         @RequestParam(value = "password") String password,
+                                         @RequestParam(value = "new_password") String newPassword) {
+
+        throw new NotYetImplementedException();
+    }
+
+    /**
      * Records changes to the user's profile
      *
      * @return true iff operation succeeds
      * @effect HTTP POST Request updates the model/database
      */
-    @PostMapping(value = "/updateUserProfile", consumes = "application/json", produces = "application/json")
+    @PostMapping(value = "/update-profile", consumes = "application/json", produces = "application/json")
     public String updateUserProfile(@RequestBody String user, @RequestParam(value = "access_token") String accessToken) {
 
         // Overview

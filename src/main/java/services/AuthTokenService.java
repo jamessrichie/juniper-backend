@@ -19,8 +19,8 @@ import model.DatabaseConnection;
  * <a href="https://www.rfc-editor.org/rfc/rfc6749#section-1.5">The OAuth 2.0 Authorization Framework</a>
  *
  * Current implementation of the AuthTokenService does not allow for multiple clients to log into
- * the same account. Logging into a new client generate a new token family and invalidate previous
- * refresh tokens. We will pretend that this is a feature, not a bug, à la Snapchat
+ * the same account. Logging into a new client will generate a new token family and invalidate
+ * previous refresh tokens. We will pretend that this is a feature, not a bug, à la Snapchat
  */
 public class AuthTokenService {
 

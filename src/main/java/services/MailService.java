@@ -65,7 +65,7 @@ public class MailService {
         try {
             String subject = "Please verify your email";
             String content = Utilities.loadTemplate("verification/verification_email.html");
-            String verificationUrl = apiHost + "/user/verifyEmail?code=" + verificationCode;
+            String verificationUrl = apiHost + "/user/verify?code=" + verificationCode;
 
             content = content.replace("[[name]]", substringBefore(name, " "));
             content = content.replace("[[url]]", verificationUrl);
