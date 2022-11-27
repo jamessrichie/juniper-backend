@@ -57,6 +57,10 @@ public class DatabaseConnection {
     private static final String UPDATE_REFRESH_TOKEN = "UPDATE tbl_users SET refresh_token_id = ?, refresh_token_family = ? WHERE user_id = ?";
     private PreparedStatement updateRefreshTokenStatement;
 
+    // Sets a user's email, salt and hash fields
+    private static final String UPDATE_CREDENTIALS = "UPDATE tbl_users SET email = ?, salt = ?, hash = ? WHERE user_id = ?";
+    private PreparedStatement updateCredentialsStatement;
+
     // Maps user handle -> user record
     private static final String RESOLVE_USER_HANDLE_TO_USER_RECORD = "SELECT * FROM tbl_users WHERE user_handle = ?";
     private PreparedStatement resolveUserHandleToUserRecordStatement;
@@ -135,6 +139,7 @@ public class DatabaseConnection {
         checkVerificationCodeActiveStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_ACTIVE);
         updateEmailVerificationStatement = conn.prepareStatement(UPDATE_EMAIL_VERIFICATION);
         updateRefreshTokenStatement = conn.prepareStatement(UPDATE_REFRESH_TOKEN);
+        updateCredentialsStatement = conn.prepareStatement(UPDATE_CREDENTIALS);
         resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
         resolveEmailToUserRecordStatement = conn.prepareStatement(RESOLVE_EMAIL_TO_USER_RECORD);
         resolveUserIdToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_USER_RECORD);
@@ -216,7 +221,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<String> transaction_getUserName(String email) {
         try {
-            // retrieves the username that the email is mapped to
+            // retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
@@ -352,15 +357,16 @@ public class DatabaseConnection {
      */
     public ResponseEntity<Boolean> transaction_verifyCredentials(String email, String password) {
         try {
-            // retrieves the username that the email is mapped to
+            // retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
+                // if user does not exist, vaguely claim that credentials are incorrect
                 resolveEmailToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(false, HttpStatus.OK);
             }
 
-            byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
             byte[] salt = resolveEmailToUserRecordRS.getBytes("salt");
+            byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
             resolveEmailToUserRecordRS.close();
 
             return new ResponseEntity<>(Arrays.equals(hash, get_hash(password, salt)), HttpStatus.OK);
@@ -368,6 +374,54 @@ public class DatabaseConnection {
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Verifies the user's credentials
+     *
+     * @return true iff user's email and password matches
+     */
+    public ResponseEntity<Boolean> transaction_updateCredentials(String email, String password, String newEmail, String newPassword) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                // retrieves the user record that the email is mapped to
+                ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
+                if (!resolveEmailToUserRecordRS.next()) {
+                    // if user does not exist, vaguely claim that credentials are incorrect
+                    resolveEmailToUserRecordRS.close();
+                    return new ResponseEntity<>(false, HttpStatus.OK);
+                }
+
+                String userId = resolveEmailToUserRecordRS.getString("userId");
+                byte[] salt = resolveEmailToUserRecordRS.getBytes("salt");
+                byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
+                resolveEmailToUserRecordRS.close();
+
+                // check that credentials are correct
+                if (!Arrays.equals(hash, get_hash(password, salt))) {
+                    return new ResponseEntity<>(false, HttpStatus.OK);
+                }
+
+                byte[] newSalt = get_salt();
+                byte[] newHash = get_hash(newPassword, newSalt);
+
+                // creates the user
+                executeUpdate(updateCredentialsStatement, newEmail, newSalt, newHash, userId);
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenId(String userId, String tokenId) {
@@ -427,10 +481,6 @@ public class DatabaseConnection {
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
-    }
-
-    public Boolean transaction_updateUserCredentials() {
-        throw new NotYetImplementedException();
     }
 
     public Boolean transaction_updateUserProfile() {

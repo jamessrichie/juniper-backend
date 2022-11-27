@@ -37,7 +37,7 @@ public class AuthTokenService {
         this(new DatabaseConnection());
     }
 
-    public AuthTokenService(DatabaseConnection dbconn) throws IOException, SQLException {
+    public AuthTokenService(DatabaseConnection dbconn) throws IOException {
         this.dbconn = dbconn;
 
         Properties configProps = new Properties();
@@ -198,5 +198,12 @@ public class AuthTokenService {
             e.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Revokes all refresh tokens. All remaining access tokens will expire within 10 minutes
+     */
+    public Boolean revokeTokens(String userId) {
+         return dbconn.transaction_updateRefreshToken(userId, null, null).getBody();
     }
 }

@@ -24,6 +24,11 @@ public class AuthController {
         authTokenService = new AuthTokenService();
     }
 
+    /**
+     * Logs into an existing verified user account
+     *
+     * @return if success, return access and refresh tokens within a new token family
+     */
     @PostMapping("/login")
     public ResponseEntity<String> verifyUserCredentials(@RequestParam(value = "email") String email,
                                                         @RequestParam(value = "password") String password) {
@@ -49,6 +54,46 @@ public class AuthController {
         return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
 
+    /**
+     * Updates the login credentials of an existing user account
+     *
+     * @return if success, return access and refresh tokens within a new token family
+     */
+    @PostMapping("/update-credentials")
+    public ResponseEntity<String> updateUserCredentials(@RequestParam(value = "userId") String userId,
+                                                        @RequestParam(value = "password") String password,
+                                                        @RequestParam(value = "new_email") String newEmail,
+                                                        @RequestParam(value = "new_password") String newPassword) {
+
+        newEmail = newEmail.toLowerCase();
+
+        ResponseEntity<Boolean> updateCredentialsStatus = dbconn.transaction_updateCredentials(userId, password, newEmail, newPassword);
+        if (Boolean.FALSE.equals(updateCredentialsStatus.getBody())) {
+            return new ResponseEntity<>("Incorrect credentials\n", HttpStatus.UNAUTHORIZED);
+        }
+        return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
+    }
+
+    /**
+     * Revokes all refresh tokens. All remaining access tokens will expire within 10 minutes
+     *
+     * @return HTTP status code with message
+     */
+    @PostMapping("/sign-out")
+    public ResponseEntity<String> revokeTokens(@RequestParam(value = "userId") String userId) {
+
+        if (authTokenService.revokeTokens(userId)) {
+            return new ResponseEntity<>("All tokens revoked", HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Renews access and refresh tokens given valid refresh token
+     *
+     * @return access and refresh tokens within the same token family
+     */
     @PostMapping("/renew-tokens")
     public ResponseEntity<String> renewTokens(@RequestParam(value = "user_id") String userId,
                                               @RequestParam(value = "refresh_token") String refreshToken) {

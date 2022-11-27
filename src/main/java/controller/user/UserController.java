@@ -101,7 +101,7 @@ public class UserController {
     }
 
     /**
-     * Verifies a user and redirects them to the login page
+     * Verifies a user's email and redirects them to a status page
      *
      * @return HTTP status code with message
      * @url .../user/verify?code=value1
@@ -132,21 +132,6 @@ public class UserController {
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     verifyEmailStatus.getStatusCode());
         };
-    }
-
-    /**
-     * Updates the login credentials of an existing user account
-     *
-     * @return
-     * @url .../user/updateUserCredentials?userId=value1&password=value2&newPassword=value3
-     */
-    @PostMapping("/updateUserCredentials")
-    public Boolean updateUserCredentials(@RequestParam(value = "email") String email,
-                                         @RequestParam(value = "new_email") String newEmail,
-                                         @RequestParam(value = "password") String password,
-                                         @RequestParam(value = "new_password") String newPassword) {
-
-        throw new NotYetImplementedException();
     }
 
     /**
