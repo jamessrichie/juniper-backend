@@ -381,20 +381,20 @@ public class DatabaseConnection {
      *
      * @return true iff user's email and password matches
      */
-    public ResponseEntity<Boolean> transaction_updateCredentials(String email, String password, String newEmail, String newPassword) {
+    public ResponseEntity<Boolean> transaction_updateCredentials(String userId, String password, String newEmail, String newPassword) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
                 // retrieves the user record that the email is mapped to
-                ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
+                ResultSet resolveEmailToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
                 if (!resolveEmailToUserRecordRS.next()) {
                     // if user does not exist, vaguely claim that credentials are incorrect
                     resolveEmailToUserRecordRS.close();
+                    System.out.println("USER DOES NOT EXIST");
                     return new ResponseEntity<>(false, HttpStatus.OK);
                 }
-
-                String userId = resolveEmailToUserRecordRS.getString("userId");
+                
                 byte[] salt = resolveEmailToUserRecordRS.getBytes("salt");
                 byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
                 resolveEmailToUserRecordRS.close();

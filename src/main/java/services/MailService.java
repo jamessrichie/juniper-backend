@@ -61,7 +61,7 @@ public class MailService {
     /**
      * Sends a verification code to the recipient
      */
-    public ResponseEntity<String> sendVerificationEmail(String name, String toAddress, String verificationCode) {
+    public ResponseEntity<Object> sendVerificationEmail(String name, String toAddress, String verificationCode) {
         try {
             String subject = "Please verify your email";
             String content = Utilities.loadTemplate("verification/verification_email.html");
@@ -73,10 +73,10 @@ public class MailService {
 
             sendEmail(toAddress, subject, content);
 
-            return new ResponseEntity<>("Successfully sent verification email", HttpStatus.OK);
+            return Utilities.createJSONResponseEntity("Successfully sent verification email", HttpStatus.OK);
 
         } catch (Exception e) {
-            return new ResponseEntity<>("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
+            return Utilities.createJSONResponseEntity("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

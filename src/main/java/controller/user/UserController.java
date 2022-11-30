@@ -36,20 +36,21 @@ public class UserController {
      * Creates a new user account
      *
      * @return HTTP status code with message
-     * @url .../user/create?name=value1&email=value2&password=value3
      */
-    @PostMapping("/create")
-    public ResponseEntity<String> createUser(@RequestParam(value = "name") String name,
-                                             @RequestParam(value = "email") String email,
-                                             @RequestParam(value = "password") String password) {
+    @RequestMapping(path = "/create",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> createUser(@RequestBody Map<String, String> payload) {
 
-        name = WordUtils.capitalizeFully(name);
-        email = email.toLowerCase();
+        String name = WordUtils.capitalizeFully(payload.get("name"));
+        String email = payload.get("email").toLowerCase();
+        String password = payload.get("password");
 
         // check that the email is not in use
         ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
         if (getUserIdStatus.getStatusCode() == HttpStatus.OK) {
-            return new ResponseEntity<>("Email is already in use\n", HttpStatus.BAD_REQUEST);
+            return Utilities.createJSONResponseEntity("Email is already in use", HttpStatus.BAD_REQUEST);
         }
 
         String userId = UUID.randomUUID().toString();
@@ -65,7 +66,7 @@ public class UserController {
         // creates the user
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
         if (createUserStatus.getStatusCode() != HttpStatus.OK) {
-            return new ResponseEntity<>("Failed to create user\n", createUserStatus.getStatusCode());
+            return Utilities.createJSONResponseEntity("Failed to create user", createUserStatus.getStatusCode());
         }
         // on success, send verification email
         return mailService.sendVerificationEmail(name, email, verificationCode);
@@ -75,24 +76,26 @@ public class UserController {
      * Sends a verification email
      *
      * @return HTTP status code with message
-     * @url .../user/send-verification-email?email=value1
      */
-    @PostMapping("/send-verification-email")
-    public ResponseEntity<String> sendVerificationEmail(@RequestParam(value = "email") String email) {
+    @RequestMapping(path = "/send-verification-email",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> sendVerificationEmail(@RequestBody Map<String, String> payload) {
 
-        email = email.toLowerCase();
+        String email = payload.get("email").toLowerCase();
 
         // gets the name of the user
         ResponseEntity<String> getUserNameStatus = dbconn.transaction_getUserName(email);
         if (getUserNameStatus.getStatusCode() != HttpStatus.OK) {
-            return getUserNameStatus;
+            return Utilities.createJSONResponseEntity(getUserNameStatus);
         }
         String name = getUserNameStatus.getBody();
 
         // gets the verification code for the user
         ResponseEntity<String> getVerificationCodeStatus = dbconn.transaction_getVerificationCode(email);
         if (getVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
-            return new ResponseEntity<>("Failed to send email\n", getVerificationCodeStatus.getStatusCode());
+            return Utilities.createJSONResponseEntity("Failed to send email", getVerificationCodeStatus.getStatusCode());
         }
         String verificationCode = getVerificationCodeStatus.getBody();
 
@@ -104,9 +107,9 @@ public class UserController {
      * Verifies a user's email and redirects them to a status page
      *
      * @return HTTP status code with message
-     * @url .../user/verify?code=value1
      */
-    @GetMapping("/verify")
+    @RequestMapping(path = "/verify",
+        method = RequestMethod.GET)
     public ResponseEntity<String> verifyEmail(@RequestParam(value = "code") String verificationCode) {
 
         ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(verificationCode);
@@ -140,8 +143,11 @@ public class UserController {
      * @return true iff operation succeeds
      * @effect HTTP POST Request updates the model/database
      */
-    @PostMapping(value = "/update-profile", consumes = "application/json", produces = "application/json")
-    public String updateUserProfile(@RequestBody String user, @RequestParam(value = "access_token") String accessToken) {
+    @RequestMapping(path = "/update-profile",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<String> updateUserProfile(@RequestBody Map<String, String> payload) {
 
         // Overview
         // ––––––––––––––––––––––––––––––––––––––––––––––––––––––

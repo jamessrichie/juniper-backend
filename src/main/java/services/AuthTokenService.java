@@ -13,6 +13,7 @@ import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
 import model.DatabaseConnection;
+import types.AuthTokens;
 
 /**
  * Consult section 1.5 of the following standard for further details <br>
@@ -112,7 +113,7 @@ public class AuthTokenService {
      *
      * @return comma-separated signed JSON Web Tokens
      */
-    public String generateAccessAndRefreshTokens(String userId) {
+    public AuthTokens generateAccessAndRefreshTokens(String userId) {
         return generateAccessAndRefreshTokens(userId, UUID.randomUUID().toString());
     }
 
@@ -121,7 +122,7 @@ public class AuthTokenService {
      *
      * @return comma-separated signed JSON Web Tokens
      */
-    public String generateAccessAndRefreshTokens(String userId, String refreshTokenFamily) {
+    public AuthTokens generateAccessAndRefreshTokens(String userId, String refreshTokenFamily) {
         String refreshTokenId = UUID.randomUUID().toString();
 
         String accessToken = generateAccessToken(userId);
@@ -134,7 +135,7 @@ public class AuthTokenService {
         if (updateRefreshTokenStatus.getStatusCode() != HttpStatus.OK) {
             return null;
         }
-        return accessToken + "," + refreshToken;
+        return new AuthTokens(accessToken, refreshToken);
     }
 
     /**
@@ -164,7 +165,7 @@ public class AuthTokenService {
      *
      * @return if valid, then return a new access and refresh token. otherwise return null
      */
-    public String verifyRefreshToken(String userId, String token) {
+    public AuthTokens verifyRefreshToken(String userId, String token) {
         try {
             DecodedJWT decodedToken = refreshTokenVerifier.verify(token);
 
