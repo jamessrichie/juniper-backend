@@ -54,13 +54,7 @@ public class UserController {
         }
 
         String userId = UUID.randomUUID().toString();
-        String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
-
-        // check that user handle is unique
-        while (dbconn.transaction_userHandleToUserIdResolution(userHandle).getBody() != null) {
-            userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
-        }
-
+        String userHandle = generateUserHandle(name);
         String verificationCode = generateVerificationCode(64);
 
         // creates the user
@@ -156,6 +150,19 @@ public class UserController {
         // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
 
         throw new NotYetImplementedException();
+    }
+
+    /**
+     * Generates a unique user handle from a name
+     */
+    private String generateUserHandle(String name) {
+        String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
+
+        // check that user handle is unique
+        while (dbconn.transaction_userHandleToUserIdResolution(userHandle).getBody() != null) {
+            userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
+        }
+        return userHandle;
     }
 
     /**
