@@ -22,15 +22,23 @@ public class AuthController {
     // Token authentication service
     private final AuthTokenService authTokenService;
 
+    /**
+     * Initializes controller
+     */
     public AuthController() throws IOException, SQLException {
         dbconn = new DatabaseConnection();
         authTokenService = new AuthTokenService();
     }
 
     /**
-     * Logs into an existing verified user account
+     * Verifies whether the supplied credentials are valid
      *
-     * @return if success, return access and refresh tokens within a new token family
+     * @param payload JSON object containing "email", "password" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing access and refresh tokens within new token family if success.
+     *         otherwise, JSON object containing status message.
+     *         200 status code iff success
      */
     @RequestMapping(path = "/verify-credentials",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -42,31 +50,36 @@ public class AuthController {
         String password = payload.get("password");
 
         // check that the email has been verified
-        ResponseEntity<Boolean> checkEmailVerificationStatus = dbconn.transaction_checkEmailVerification(email);
-        if (Boolean.FALSE.equals(checkEmailVerificationStatus.getBody())) {
-            return Utilities.createJSONResponseEntity("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
+        ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
+        if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
+            return Utilities.createJSONWithStatusMessage("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
         }
 
         // check that the credentials are correct
         ResponseEntity<Boolean> verifyCredentialsStatus = dbconn.transaction_verifyCredentials(email, password);
         if (Boolean.FALSE.equals(verifyCredentialsStatus.getBody())) {
-            return Utilities.createJSONResponseEntity("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            return Utilities.createJSONWithStatusMessage("Incorrect credentials", HttpStatus.UNAUTHORIZED);
         }
 
         // get the userId for token generation
-        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
-        if (getUserIdStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONResponseEntity("Failed to verify credentials", HttpStatus.BAD_REQUEST);
+        ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
+        if (resolveEmailToUserIdStatus.getStatusCode() != HttpStatus.OK) {
+            return Utilities.createJSONWithStatusMessage("Failed to verify credentials", HttpStatus.BAD_REQUEST);
         }
 
-        String userId = getUserIdStatus.getBody();
+        String userId = resolveEmailToUserIdStatus.getBody();
         return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
 
     /**
-     * Updates the login credentials of an existing user account
+     * Updates the user's credentials
      *
-     * @return if success, return access and refresh tokens within a new token family
+     * @param payload JSON object containing "userId", "password", "newPassword" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing access and refresh tokens within new token family if success.
+     *         otherwise, JSON object containing status message.
+     *         200 status code iff success
      */
     @RequestMapping(path = "/update-credentials",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -76,12 +89,11 @@ public class AuthController {
 
         String userId = payload.get("userId");
         String password = payload.get("password");
-        String newEmail = payload.get("newEmail").toLowerCase();;
         String newPassword = payload.get("newPassword");
 
-        ResponseEntity<Boolean> updateCredentialsStatus = dbconn.transaction_updateCredentials(userId, password, newEmail, newPassword);
+        ResponseEntity<Boolean> updateCredentialsStatus = dbconn.transaction_updateCredentials(userId, password, newPassword);
         if (Boolean.FALSE.equals(updateCredentialsStatus.getBody())) {
-            return Utilities.createJSONResponseEntity("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            return Utilities.createJSONWithStatusMessage("Incorrect credentials", HttpStatus.UNAUTHORIZED);
         }
         return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
@@ -89,7 +101,10 @@ public class AuthController {
     /**
      * Revokes all refresh tokens. All remaining access tokens will expire within 10 minutes
      *
-     * @return HTTP status code with message
+     * @param payload JSON object containing "userId" field
+     * @apiNote POST request
+     *
+     * @return JSON object containing status message. 200 status code iff success
      */
     @RequestMapping(path = "/revoke-tokens",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -100,16 +115,21 @@ public class AuthController {
         String userId = payload.get("userId");
 
         if (authTokenService.revokeTokens(userId)) {
-            return Utilities.createJSONResponseEntity("All tokens revoked", HttpStatus.OK);
+            return Utilities.createJSONWithStatusMessage("All tokens revoked", HttpStatus.OK);
         } else {
-            return Utilities.createJSONResponseEntity("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
+            return Utilities.createJSONWithStatusMessage("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
      * Renews access and refresh tokens given valid refresh token
      *
-     * @return access and refresh tokens within the same token family
+     * @param payload JSON object containing "userId", "refreshToken" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing access and refresh tokens within current token family if success.
+     *         otherwise, JSON object containing status message.
+     *         200 status code iff success
      */
     @RequestMapping(path = "/renew-tokens",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -124,7 +144,7 @@ public class AuthController {
         if (tokens != null) {
             return new ResponseEntity<>(tokens, HttpStatus.OK);
         } else {
-            return Utilities.createJSONResponseEntity("Refresh token rejected", HttpStatus.UNAUTHORIZED);
+            return Utilities.createJSONWithStatusMessage("Refresh token rejected", HttpStatus.UNAUTHORIZED);
         }
     }
 }

@@ -1,6 +1,7 @@
 package types;
 
 public class AuthTokens {
+
     public String accessToken;
     public String refreshToken;
 

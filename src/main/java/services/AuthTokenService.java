@@ -17,7 +17,7 @@ import types.AuthTokens;
 
 /**
  * Consult section 1.5 of the following standard for further details <br>
- * <a href="https://www.rfc-editor.org/rfc/rfc6749#section-1.5">The OAuth 2.0 Authorization Framework</a>
+ * <a href="https://www.rfc-editor.org/rfc/rfc6749#section-1.5">The OAuth 2.0 Authorization Framework</a> <br><br>
  *
  * Current implementation of the AuthTokenService does not allow for multiple clients to log into
  * the same account. Logging into a new client will generate a new token family and invalidate
@@ -28,16 +28,22 @@ public class AuthTokenService {
     // Database connection
     private final DatabaseConnection dbconn;
 
-    private final String apiHost;
+    private final String API_HOST;
 
     private final Algorithm HMAC256Algorithm;
     private final JWTVerifier accessTokenVerifier;
     private final JWTVerifier refreshTokenVerifier;
 
+    /**
+     * Creates a new AuthTokenService instance with a new database connection
+     */
     public AuthTokenService() throws IOException, SQLException {
         this(new DatabaseConnection());
     }
 
+    /**
+     * Creates a new AuthTokenService instance with an existing database connection
+     */
     public AuthTokenService(DatabaseConnection dbconn) throws IOException {
         this.dbconn = dbconn;
 
@@ -45,20 +51,20 @@ public class AuthTokenService {
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/jwt.credentials")));
 
-        apiHost = configProps.getProperty("API_HOST");
+        API_HOST = configProps.getProperty("API_HOST");
         String privateKey = configProps.getProperty("JWT_PRIVATE_KEY");
 
         HMAC256Algorithm = Algorithm.HMAC256(privateKey);
 
         accessTokenVerifier = JWT.require(HMAC256Algorithm)
                 .withIssuer("auth0")
-                .withAudience(apiHost)
+                .withAudience(API_HOST)
                 .withClaim("token_type", "access")
                 .build();
 
         refreshTokenVerifier = JWT.require(HMAC256Algorithm)
                 .withIssuer("auth0")
-                .withAudience(apiHost)
+                .withAudience(API_HOST)
                 .withClaim("token_type", "refresh")
                 .build();
     }
@@ -94,7 +100,7 @@ public class AuthTokenService {
      * @return a signed JSON Web Token
      */
     public String generateAccessToken(String userId) {
-        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(10, ChronoUnit.MINUTES),
+        return generateToken("auth0", userId, API_HOST, Instant.now(), Instant.now().plus(10, ChronoUnit.MINUTES),
                              UUID.randomUUID().toString(), null, "access", HMAC256Algorithm);
     }
 
@@ -104,12 +110,12 @@ public class AuthTokenService {
      * @return a signed JSON Web Token
      */
     public String generateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
-        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(180, ChronoUnit.DAYS),
+        return generateToken("auth0", userId, API_HOST, Instant.now(), Instant.now().plus(180, ChronoUnit.DAYS),
                              refreshTokenId, refreshTokenFamily, "refresh", HMAC256Algorithm);
     }
 
     /**
-     * Simultaneously generates an access and refresh token within a new token family
+     * Generates an access and refresh token within a new token family
      *
      * @return comma-separated signed JSON Web Tokens
      */
@@ -118,7 +124,7 @@ public class AuthTokenService {
     }
 
     /**
-     * Simultaneously generates an access and refresh token within the same token family
+     * Generates an access and refresh token within the same token family
      *
      * @return comma-separated signed JSON Web Tokens
      */

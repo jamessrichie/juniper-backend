@@ -19,7 +19,7 @@ public class DatabaseConnection {
     private final Connection conn;
 
     // Flag enabling the use of testing features
-    private Boolean testEnabled;
+    private final Boolean testEnabled;
 
     // Flag enabling the creation of savepoints
     private Boolean testSavepointEnabled;
@@ -32,46 +32,79 @@ public class DatabaseConnection {
     private static final int MAX_ATTEMPTS = 16;
 
     // Creates a user
-    private static final String CREATE_USER = "INSERT INTO tbl_users VALUES (?, ?, ?, ?, ?, ?, null, null, null, ?, UTC_TIMESTAMP(), false, false, null, null, null, null, null, 0, 0, null, null, null, null, null)";
+    private static final String CREATE_USER = "INSERT INTO tbl_users " +
+                                              "VALUES (?, ?, ?, ?, ?, ?, null, null, null, ?, UTC_TIMESTAMP(), false, " +
+                                              "false, null, null, null, null, null, null, null, null, null, null)";
     private PreparedStatement createUserStatement;
 
-    // Checks if verification code has been used
-    // if false, then either code is still active, or has expired
-    private static final String CHECK_VERIFICATION_CODE_USED = "SELECT EXISTS(SELECT * FROM tbl_users WHERE verification_code = ? AND has_verified_email = 1) AS verification_code_used";
-    private PreparedStatement checkVerificationCodeUsedStatement;
-
-    // Checks if verification code is active
-    // if false, then either code has been used, or has expired
-    private static final String CHECK_VERIFICATION_CODE_ACTIVE = "SELECT EXISTS(SELECT * FROM tbl_users WHERE verification_code = ? AND has_verified_email = 0) AS verification_code_active";
-    private PreparedStatement checkVerificationCodeActiveStatement;
-
-    // Checks if the email has been verified
-    private static final String CHECK_EMAIL_VERIFICATION = "SELECT has_verified_email FROM tbl_users WHERE email = ?";
-    private PreparedStatement checkEmailVerificationStatement;
-
-    // Sets a user's has_verified_email field
-    private static final String UPDATE_EMAIL_VERIFICATION = "UPDATE tbl_users SET has_verified_email = ? WHERE verification_code = ?";
-    private PreparedStatement updateEmailVerificationStatement;
-
-    // Sets a user's refresh_token_id and refresh_token_family fields
-    private static final String UPDATE_REFRESH_TOKEN = "UPDATE tbl_users SET refresh_token_id = ?, refresh_token_family = ? WHERE user_id = ?";
-    private PreparedStatement updateRefreshTokenStatement;
-
-    // Sets a user's email, salt and hash fields
-    private static final String UPDATE_CREDENTIALS = "UPDATE tbl_users SET email = ?, salt = ?, hash = ? WHERE user_id = ?";
+    // Sets a user's salt and hash fields
+    private static final String UPDATE_CREDENTIALS = "UPDATE tbl_users " +
+                                                     "SET salt = ?, hash = ? " +
+                                                     "WHERE user_id = ?";
     private PreparedStatement updateCredentialsStatement;
 
-    // Maps user handle -> user record
-    private static final String RESOLVE_USER_HANDLE_TO_USER_RECORD = "SELECT * FROM tbl_users WHERE user_handle = ?";
-    private PreparedStatement resolveUserHandleToUserRecordStatement;
+    // Sets a user's has_verified_email field
+    private static final String UPDATE_EMAIL_VERIFICATION = "UPDATE tbl_users " +
+                                                            "SET has_verified_email = ? " +
+                                                            "WHERE verification_code = ?";
+    private PreparedStatement updateEmailVerificationStatement;
 
-    // Maps email -> user record
-    private static final String RESOLVE_EMAIL_TO_USER_RECORD = "SELECT * FROM tbl_users WHERE email = ?";
+    // Sets a user's user_handle, user_name, email, date_of_birth, city, state, and country fields
+    private static final String UPDATE_PERSONAL = "UPDATE tbl_users " +
+                                                  "SET user_handle = ?, user_name = ?, " +
+                                                  "email = ?, date_of_birth = ?, " +
+                                                  "city = ?, state = ?, " +
+                                                  "country = ? " +
+                                                  "WHERE user_id = ?";
+    private PreparedStatement updatePersonalStatement;
+
+    // Sets a user's profile_picture_url field
+    private static final String UPDATE_PROFILE_PICTURE = "UPDATE tbl_users " +
+                                                         "SET profile_picture_url = ? " +
+                                                         "WHERE user_id = ?";
+    private PreparedStatement updateProfilePictureStatement;
+
+    // Sets a user's refresh_token_id and refresh_token_family fields
+    private static final String UPDATE_REFRESH_TOKEN = "UPDATE tbl_users " +
+                                                       "SET refresh_token_id = ?, refresh_token_family = ? " +
+                                                       "WHERE user_id = ?";
+    private PreparedStatement updateRefreshTokenStatement;
+
+    // Gets the user record for an email
+    private static final String RESOLVE_EMAIL_TO_USER_RECORD = "SELECT * FROM tbl_users " +
+                                                               "WHERE email = ?";
     private PreparedStatement resolveEmailToUserRecordStatement;
 
-    // Maps user id -> user record
-    private static final String RESOLVE_USER_ID_TO_USER_RECORD = "SELECT * FROM tbl_users WHERE user_id = ?";
+    // Gets the user record for a user_handle
+    private static final String RESOLVE_USER_HANDLE_TO_USER_RECORD = "SELECT * FROM tbl_users " +
+                                                                     "WHERE user_handle = ?";
+    private PreparedStatement resolveUserHandleToUserRecordStatement;
+
+    // Gets the user record for a user_id
+    private static final String RESOLVE_USER_ID_TO_USER_RECORD = "SELECT * FROM tbl_users " +
+                                                                 "WHERE user_id = ?";
     private PreparedStatement resolveUserIdToUserRecordStatement;
+
+    // Checks if the email has been verified
+    private static final String CHECK_EMAIL_VERIFICATION = "SELECT has_verified_email FROM tbl_users " +
+                                                           "WHERE email = ?";
+    private PreparedStatement checkEmailVerificationStatement;
+
+    // Checks if verification code is active. If false, then either code has been used, or has expired
+    private static final String CHECK_VERIFICATION_CODE_ACTIVE = "SELECT EXISTS(" +
+                                                                     "SELECT * FROM tbl_users " +
+                                                                     "WHERE verification_code = ? " +
+                                                                     "AND has_verified_email = 0) " +
+                                                                 "AS verification_code_active";
+    private PreparedStatement checkVerificationCodeActiveStatement;
+
+    // Checks if verification code has been used. If false, then either code is still active, or has expired
+    private static final String CHECK_VERIFICATION_CODE_USED = "SELECT EXISTS(" +
+                                                                   "SELECT * FROM tbl_users " +
+                                                                   "WHERE verification_code = ? " +
+                                                                   "AND has_verified_email = 1) " +
+                                                                "AS verification_code_used";
+    private PreparedStatement checkVerificationCodeUsedStatement;
 
     /**
      * Creates a connection to the database specified in dbconn.credentials
@@ -104,7 +137,8 @@ public class DatabaseConnection {
         String adminName = configProps.getProperty("RDS_USERNAME");
         String password = configProps.getProperty("RDS_PASSWORD");
 
-        String connectionUrl = String.format("jdbc:mysql://%s:%s/%s?user=%s&password=%s", endpoint, port, dbName, adminName, password);
+        String connectionUrl = String.format("jdbc:mysql://%s:%s/%s?user=%s&password=%s",
+                                             endpoint, port, dbName, adminName, password);
         Connection conn = DriverManager.getConnection(connectionUrl);
 
         // Automatically commit after each statement
@@ -134,45 +168,32 @@ public class DatabaseConnection {
      * Prepare all the SQL statements
      */
     private void prepareStatements() throws SQLException {
+        // Create statements
         createUserStatement = conn.prepareStatement(CREATE_USER);
-        checkVerificationCodeUsedStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_USED);
-        checkVerificationCodeActiveStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_ACTIVE);
-        updateEmailVerificationStatement = conn.prepareStatement(UPDATE_EMAIL_VERIFICATION);
-        updateRefreshTokenStatement = conn.prepareStatement(UPDATE_REFRESH_TOKEN);
+
+        // Update statements
         updateCredentialsStatement = conn.prepareStatement(UPDATE_CREDENTIALS);
-        resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
+        updateEmailVerificationStatement = conn.prepareStatement(UPDATE_EMAIL_VERIFICATION);
+        updatePersonalStatement = conn.prepareStatement(UPDATE_PERSONAL);
+        updateProfilePictureStatement = conn.prepareStatement(UPDATE_PROFILE_PICTURE);
+        updateRefreshTokenStatement = conn.prepareStatement(UPDATE_REFRESH_TOKEN);
+
+        // Select statements
         resolveEmailToUserRecordStatement = conn.prepareStatement(RESOLVE_EMAIL_TO_USER_RECORD);
+        resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
         resolveUserIdToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_USER_RECORD);
+
+        // Boolean check statements
         checkEmailVerificationStatement = conn.prepareStatement(CHECK_EMAIL_VERIFICATION);
-    }
-
-    /**
-     * Gets the user id for a user handle
-     *
-     * @return if user handle exists, return user id. otherwise return null
-     */
-    public ResponseEntity<String> transaction_userHandleToUserIdResolution(String userHandle) {
-        try{
-            // checks that user handle is not mapped to a user id
-            ResultSet resolveUserHandleToUserRecordRS = executeQuery(resolveUserHandleToUserRecordStatement, userHandle);
-            if (!resolveUserHandleToUserRecordRS.next()) {
-                resolveUserHandleToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.OK);
-            }
-            String userId = resolveUserHandleToUserRecordRS.getString("user_id");
-            resolveUserHandleToUserRecordRS.close();
-
-            return new ResponseEntity<>(userId, HttpStatus.OK);
-
-        } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        checkVerificationCodeActiveStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_ACTIVE);
+        checkVerificationCodeUsedStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_USED);
     }
 
     /**
      * Creates a new user with an unverified email
      *
-     * @return true iff successfully created new user
+     * @effect tbl_users (RW), acquires lock
+     * @return true / 200 status code iff successfully created new user
      */
     public ResponseEntity<Boolean> transaction_createUser(String userId, String userHandle, String name, String email,
                                                          String password, String verificationCode) {
@@ -190,7 +211,7 @@ public class DatabaseConnection {
                 resolveEmailToUserRecordRS.close();
 
                 // checks that user handle is not mapped to a user id
-                if (transaction_userHandleToUserIdResolution(userHandle).getBody() != null) {
+                if (transaction_userHandleToUserId(userHandle).getBody() != null) {
                     return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
                 }
 
@@ -215,17 +236,43 @@ public class DatabaseConnection {
     }
 
     /**
-     * Gets the name for a specified user
+     * Gets the user_id for a user_handle
      *
-     * @return if email exists, return name. otherwise return null
+     * @effect tbl_users (R), non-locking
+     * @return user_id / 200 status code if user_handle exists. otherwise, return null
      */
-    public ResponseEntity<String> transaction_getUserName(String email) {
+    public ResponseEntity<String> transaction_userHandleToUserId(String userHandle) {
+        try{
+            // checks that user handle is not mapped to a user id
+            ResultSet resolveUserHandleToUserRecordRS = executeQuery(resolveUserHandleToUserRecordStatement,
+                                                                     userHandle);
+            if (!resolveUserHandleToUserRecordRS.next()) {
+                resolveUserHandleToUserRecordRS.close();
+                return new ResponseEntity<>(null, HttpStatus.GONE);
+            }
+            String userId = resolveUserHandleToUserRecordRS.getString("user_id");
+            resolveUserHandleToUserRecordRS.close();
+
+            return new ResponseEntity<>(userId, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Gets the user_name for an email
+     *
+     * @effect tbl_users (R), non-locking
+     * @return user_name / 200 status code if email exists. otherwise, return null
+     */
+    public ResponseEntity<String> transaction_resolveEmailToUserName(String email) {
         try {
             // retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(null, HttpStatus.GONE);
             }
             String name = resolveEmailToUserRecordRS.getString("user_name");
             resolveEmailToUserRecordRS.close();
@@ -238,38 +285,38 @@ public class DatabaseConnection {
     }
 
     /**
-     * Gets the id for a specified user
+     * Gets the user_id for an email
      *
-     * @return if email exists, return id. otherwise return null
+     * @effect tbl_users (R), non-locking
+     * @return user_id / 200 status code if email exists. otherwise, return null
      */
-    public ResponseEntity<String> transaction_getUserId(String email) {
+    public ResponseEntity<String> transaction_resolveEmailToUserId(String email) {
         try {
-            // retrieves the username that the email is mapped to
+            // retrieves the user name that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(null, HttpStatus.GONE);
             }
-            String name = resolveEmailToUserRecordRS.getString("user_id");
+            String userId = resolveEmailToUserRecordRS.getString("user_id");
             resolveEmailToUserRecordRS.close();
 
-            return new ResponseEntity<>(name, HttpStatus.OK);
+            return new ResponseEntity<>(userId, HttpStatus.OK);
 
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-
-
     /**
-     * Gets the verification code for a specified user
+     * Gets the verification_code for an email
      *
-     * @return if account exists, return verification code. otherwise return null
+     * @effect tbl_users (R), non-locking
+     * @return verification_code / 200 status code if email exists. otherwise, return null
      */
-    public ResponseEntity<String> transaction_getVerificationCode(String email) {
+    public ResponseEntity<String> transaction_resolveEmailToVerificationCode(String email) {
         try {
-            // gets the verification code associated with the email
+            // retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 return new ResponseEntity<>(null, HttpStatus.GONE);
@@ -287,36 +334,44 @@ public class DatabaseConnection {
     }
 
     /**
-     * Checks whether the user has been verified
+     * Verifies whether the user's email has been verified
      *
-     * @return
+     * @effect tbl_users (R), non-locking
+     * @return true / 200 status code iff user has been verified
      */
-    public ResponseEntity<Boolean> transaction_checkEmailVerification(String email) {
+    public ResponseEntity<Boolean> transaction_verifyEmail(String email) {
         try {
-            // gets the verification code associated with the email
+            // retrieves the verification code that the email is mapped to
             ResultSet checkEmailVerificationRS = executeQuery(checkEmailVerificationStatement, email);
-            checkEmailVerificationRS.next();
-
-            return new ResponseEntity<>(checkEmailVerificationRS.getBoolean("has_verified_email"), HttpStatus.OK);
+            if (!checkEmailVerificationRS.next()) {
+                checkEmailVerificationRS.close();
+                return new ResponseEntity<>(false, HttpStatus.GONE);
+            } else if (checkEmailVerificationRS.getBoolean("has_verified_email")) {
+                return new ResponseEntity<>(true, HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
+            }
 
         } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Verifies the user associated with the verification code
+     * Processes the verification code
      *
-     * @return true iff user has been verified
+     * @effect tbl_users (RW), acquires lock
+     * @return true / 200 status code iff user is successfully verified
      */
-    public ResponseEntity<Boolean> transaction_verifyEmail(String verificationCode) {
+    public ResponseEntity<Boolean> transaction_processVerificationCode(String verificationCode) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
                 // checks whether the verification code has been used
                 // this check is done to distinguish between expired vs used verification codes
-                ResultSet checkVerificationCodeUsedRS = executeQuery(checkVerificationCodeUsedStatement, verificationCode);
+                ResultSet checkVerificationCodeUsedRS = executeQuery(checkVerificationCodeUsedStatement,
+                                                                     verificationCode);
                 checkVerificationCodeUsedRS.next();
                 if (checkVerificationCodeUsedRS.getBoolean("verification_code_used")) {
                     checkVerificationCodeUsedRS.close();
@@ -325,7 +380,8 @@ public class DatabaseConnection {
                 checkVerificationCodeUsedRS.close();
 
                 // checks whether the verification code exists and is still active
-                ResultSet checkVerificationCodeActiveRS = executeQuery(checkVerificationCodeActiveStatement, verificationCode);
+                ResultSet checkVerificationCodeActiveRS = executeQuery(checkVerificationCodeActiveStatement,
+                                                                       verificationCode);
                 checkVerificationCodeActiveRS.next();
                 if (!checkVerificationCodeActiveRS.getBoolean("verification_code_active")) {
                     checkVerificationCodeActiveRS.close();
@@ -353,7 +409,8 @@ public class DatabaseConnection {
     /**
      * Verifies the user's credentials
      *
-     * @return true iff user's email and password matches
+     * @effect tbl_user (R), non-locking
+     * @return true / 200 status code iff user's email and password matches
      */
     public ResponseEntity<Boolean> transaction_verifyCredentials(String email, String password) {
         try {
@@ -362,26 +419,31 @@ public class DatabaseConnection {
             if (!resolveEmailToUserRecordRS.next()) {
                 // if user does not exist, vaguely claim that credentials are incorrect
                 resolveEmailToUserRecordRS.close();
-                return new ResponseEntity<>(false, HttpStatus.OK);
+                return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
 
             byte[] salt = resolveEmailToUserRecordRS.getBytes("salt");
             byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
             resolveEmailToUserRecordRS.close();
 
-            return new ResponseEntity<>(Arrays.equals(hash, get_hash(password, salt)), HttpStatus.OK);
+            if (Arrays.equals(hash, get_hash(password, salt))) {
+                return new ResponseEntity<>(true, HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
+            }
 
         } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Verifies the user's credentials
+     * Updates the user's credentials
      *
-     * @return true iff user's email and password matches
+     * @effect tbl_user (RW), acquires lock
+     * @return true / 200 status code iff user's email and password have been successfully updated
      */
-    public ResponseEntity<Boolean> transaction_updateCredentials(String userId, String password, String newEmail, String newPassword) {
+    public ResponseEntity<Boolean> transaction_updateCredentials(String userId, String password, String newPassword) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
@@ -391,8 +453,7 @@ public class DatabaseConnection {
                 if (!resolveEmailToUserRecordRS.next()) {
                     // if user does not exist, vaguely claim that credentials are incorrect
                     resolveEmailToUserRecordRS.close();
-                    System.out.println("USER DOES NOT EXIST");
-                    return new ResponseEntity<>(false, HttpStatus.OK);
+                    return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
                 }
                 
                 byte[] salt = resolveEmailToUserRecordRS.getBytes("salt");
@@ -401,14 +462,14 @@ public class DatabaseConnection {
 
                 // check that credentials are correct
                 if (!Arrays.equals(hash, get_hash(password, salt))) {
-                    return new ResponseEntity<>(false, HttpStatus.OK);
+                    return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
                 }
 
                 byte[] newSalt = get_salt();
                 byte[] newHash = get_hash(newPassword, newSalt);
 
                 // creates the user
-                executeUpdate(updateCredentialsStatement, newEmail, newSalt, newHash, userId);
+                executeUpdate(updateCredentialsStatement, newSalt, newHash, userId);
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
@@ -424,44 +485,70 @@ public class DatabaseConnection {
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
+    /**
+     * Verifies the supplied refresh token
+     *
+     * @effect tbl_user (R), non-locking
+     * @return true / 200 status code iff refresh token is valid
+     */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenId(String userId, String tokenId) {
         try {
             // retrieves the refresh token id that the user id is mapped to
             ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
             if(!resolveUserIdToUserRecordRS.next()) {
                 resolveUserIdToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
 
             String refreshTokenId = resolveUserIdToUserRecordRS.getString("refresh_token_id");
             resolveUserIdToUserRecordRS.close();
 
-            return new ResponseEntity<>(tokenId.equals(refreshTokenId), HttpStatus.OK);
+            if (tokenId.equals(refreshTokenId)) {
+                return new ResponseEntity<>(true, HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
+            }
 
         } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
+    /**
+     * Checks whether the supplied token family is current
+     *
+     * @effect tbl_user (R), non-locking
+     * @return true / 200 status code iff token family is current
+     */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenFamily(String userId, String tokenFamily) {
         try {
             // retrieves the refresh token family that the user id is mapped to
             ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
             if(!resolveUserIdToUserRecordRS.next()) {
                 resolveUserIdToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
             }
 
             String refreshTokenFamily = resolveUserIdToUserRecordRS.getString("refresh_token_family");
             resolveUserIdToUserRecordRS.close();
 
-            return new ResponseEntity<>(tokenFamily.equals(refreshTokenFamily), HttpStatus.OK);
+            if (tokenFamily.equals(refreshTokenFamily)) {
+                return new ResponseEntity<>(true, HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
+            }
 
         } catch (Exception e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
+
+    /**
+     * Updates the user's refresh token
+     *
+     * @effect tbl_user (W), acquires lock
+     * @return true / 200 status code iff refresh token has been successfully updated
+     */
     public ResponseEntity<Boolean> transaction_updateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
@@ -483,8 +570,60 @@ public class DatabaseConnection {
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
-    public Boolean transaction_updateUserProfile() {
-        throw new NotYetImplementedException();
+    /**
+     * Updates the user's personal information
+     *
+     * @effect tbl_user (W), acquires lock
+     * @return true / 200 status iff user's personal information has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updateUserPersonalInfo(String userId, String userHandle, String name,
+                                                                      String email, String dateOfBirth, String city,
+                                                                      String state, String country) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                executeUpdate(updatePersonalStatement, userHandle, name, email, dateOfBirth, city, state, country, userId);
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Updates the user's profile picture
+     *
+     * @effect tbl_user (W), acquires lock
+     * @return true iff user's profile picture has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updateProfilePicture(String userId, String profilePictureUrl) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                executeUpdate(updateProfilePictureStatement, profilePictureUrl, userId);
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
     public List<String> transaction_loadUsers() {

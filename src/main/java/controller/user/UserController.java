@@ -26,6 +26,9 @@ public class UserController {
     // Mailing service
     private final MailService mailService;
 
+    /**
+     * Initializes controller
+     */
     public UserController() throws IOException, SQLException {
         dbconn = new DatabaseConnection();
         authTokenService = new AuthTokenService();
@@ -35,7 +38,10 @@ public class UserController {
     /**
      * Creates a new user account
      *
-     * @return HTTP status code with message
+     * @param payload JSON object containing "name", "email", "password" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing status message. 200 status code iff success
      */
     @RequestMapping(path = "/create",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -48,9 +54,9 @@ public class UserController {
         String password = payload.get("password");
 
         // check that the email is not in use
-        ResponseEntity<String> getUserIdStatus = dbconn.transaction_getUserId(email);
-        if (getUserIdStatus.getStatusCode() == HttpStatus.OK) {
-            return Utilities.createJSONResponseEntity("Email is already in use", HttpStatus.BAD_REQUEST);
+        ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
+        if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
+            return Utilities.createJSONWithStatusMessage("Email is already in use", HttpStatus.BAD_REQUEST);
         }
 
         String userId = UUID.randomUUID().toString();
@@ -60,7 +66,7 @@ public class UserController {
         // creates the user
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
         if (createUserStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONResponseEntity("Failed to create user", createUserStatus.getStatusCode());
+            return Utilities.createJSONWithStatusMessage("Failed to create user", createUserStatus.getStatusCode());
         }
         // on success, send verification email
         return mailService.sendVerificationEmail(name, email, verificationCode);
@@ -69,7 +75,10 @@ public class UserController {
     /**
      * Sends a verification email
      *
-     * @return HTTP status code with message
+     * @param payload JSON object containing "email" field
+     * @apiNote POST request
+     *
+     * @return JSON object containing status message. 200 status code iff success
      */
     @RequestMapping(path = "/send-verification-email",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -80,18 +89,18 @@ public class UserController {
         String email = payload.get("email").toLowerCase();
 
         // gets the name of the user
-        ResponseEntity<String> getUserNameStatus = dbconn.transaction_getUserName(email);
-        if (getUserNameStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONResponseEntity(getUserNameStatus);
+        ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
+        if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
+            return Utilities.createJSONWithStatusMessage(resolveEmailToUserNameStatus);
         }
-        String name = getUserNameStatus.getBody();
+        String name = resolveEmailToUserNameStatus.getBody();
 
         // gets the verification code for the user
-        ResponseEntity<String> getVerificationCodeStatus = dbconn.transaction_getVerificationCode(email);
-        if (getVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONResponseEntity("Failed to send email", getVerificationCodeStatus.getStatusCode());
+        ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
+        if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
+            return Utilities.createJSONWithStatusMessage("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
         }
-        String verificationCode = getVerificationCodeStatus.getBody();
+        String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
 
         // on success, send verification email
         return mailService.sendVerificationEmail(name, email, verificationCode);
@@ -100,15 +109,16 @@ public class UserController {
     /**
      * Verifies a user's email and redirects them to a status page
      *
-     * @return HTTP status code with message
+     * @apiNote GET request
+     * @return HTML page. 200 status code iff success
      */
     @RequestMapping(path = "/verify",
         method = RequestMethod.GET)
-    public ResponseEntity<String> verifyEmail(@RequestParam(value = "code") String verificationCode) {
+    public ResponseEntity<String> processVerificationCode(@RequestParam(value = "code") String verificationCode) {
 
-        ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(verificationCode);
+        ResponseEntity<Boolean> processVerificationCodeStatus = dbconn.transaction_processVerificationCode(verificationCode);
 
-        return switch (verifyEmailStatus.getStatusCode()) {
+        return switch (processVerificationCodeStatus.getStatusCode()) {
             case OK -> new ResponseEntity<>(
                     Utilities.loadTemplate("verification/verification_success_page.html").replace("[[year]]",
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
@@ -127,7 +137,7 @@ public class UserController {
             default -> new ResponseEntity<>(
                     Utilities.loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
-                    verifyEmailStatus.getStatusCode());
+                    processVerificationCodeStatus.getStatusCode());
         };
     }
 
@@ -135,13 +145,12 @@ public class UserController {
      * Records changes to the user's profile
      *
      * @return true iff operation succeeds
-     * @effect HTTP POST Request updates the model/database
      */
-    @RequestMapping(path = "/update-profile",
+    @RequestMapping(path = "/update-personal-info",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
-    public ResponseEntity<String> updateUserProfile(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<String> updatePersonalInformation(@RequestBody Map<String, String> payload) {
 
         // Overview
         // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -159,7 +168,7 @@ public class UserController {
         String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
 
         // check that user handle is unique
-        while (dbconn.transaction_userHandleToUserIdResolution(userHandle).getBody() != null) {
+        while (dbconn.transaction_userHandleToUserId(userHandle).getBody() != null) {
             userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
         }
         return userHandle;

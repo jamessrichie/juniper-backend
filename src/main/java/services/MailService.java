@@ -2,6 +2,7 @@ package services;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.*;
 import static java.lang.Integer.*;
 
 import javax.mail.MessagingException;
@@ -15,7 +16,8 @@ import helpers.Utilities;
 
 public class MailService {
 
-    private final String apiHost;
+    private final String API_HOST;
+    private final ThreadPoolExecutor executor;
     private final JavaMailSenderImpl mailSender;
 
     public MailService() throws IOException {
@@ -23,7 +25,7 @@ public class MailService {
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/smtp.credentials")));
 
-        apiHost = configProps.getProperty("API_HOST");
+        API_HOST = configProps.getProperty("API_HOST");
 
         mailSender = new JavaMailSenderImpl();
         mailSender.setHost(configProps.getProperty("SMTP_HOST"));
@@ -38,10 +40,16 @@ public class MailService {
         props.put("mail.debug", "true");
         props.put("mail.smtp.allow8bitmime", "true");
         props.put("mail.smtps.allow8bitmime", "true");
+
+        executor = new ThreadPoolExecutor(10, 10, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
     }
 
     /**
-     * Builds and sends emails
+     * Builds emails and sends them in a new thread
+     *
+     * @param toAddress recipient address
+     * @param subject email subject
+     * @param content email body
      */
     private void sendEmail(String toAddress, String subject, String content) throws MessagingException, UnsupportedEncodingException {
         String fromAddress = "support@thejuniperapp.com";
@@ -55,17 +63,23 @@ public class MailService {
         helper.setSubject(subject);
         helper.setText(content, true);
 
-        mailSender.send(message);
+        executor.execute(() -> mailSender.send(message));
     }
 
     /**
      * Sends a verification code to the recipient
+     *
+     * @param name recipient name
+     * @param toAddress recipient address
+     * @param verificationCode recipient user's verification code
+     *
+     * @return JSON object containing status message. 200 status code iff success
      */
     public ResponseEntity<Object> sendVerificationEmail(String name, String toAddress, String verificationCode) {
         try {
             String subject = "Please verify your email";
             String content = Utilities.loadTemplate("verification/verification_email.html");
-            String verificationUrl = apiHost + "/user/verify?code=" + verificationCode;
+            String verificationUrl = API_HOST + "/user/verify?code=" + verificationCode;
 
             content = content.replace("[[name]]", substringBefore(name, " "));
             content = content.replace("[[url]]", verificationUrl);
@@ -73,10 +87,10 @@ public class MailService {
 
             sendEmail(toAddress, subject, content);
 
-            return Utilities.createJSONResponseEntity("Successfully sent verification email", HttpStatus.OK);
+            return Utilities.createJSONWithStatusMessage("Successfully sent verification email", HttpStatus.OK);
 
         } catch (Exception e) {
-            return Utilities.createJSONResponseEntity("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
+            return Utilities.createJSONWithStatusMessage("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

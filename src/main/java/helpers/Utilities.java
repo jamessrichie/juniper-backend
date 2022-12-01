@@ -24,11 +24,11 @@ public final class Utilities {
         return response;
     }
 
-    public static ResponseEntity<Object> createJSONResponseEntity(String body, HttpStatus status) {
-        return new ResponseEntity<>(generateMap("body", body), status);
+    public static ResponseEntity<Object> createJSONWithStatusMessage(String status, HttpStatus statusCode) {
+        return new ResponseEntity<>(generateMap("status", status), statusCode);
     }
 
-    public static ResponseEntity<Object> createJSONResponseEntity(ResponseEntity<String> responseEntity) {
-        return createJSONResponseEntity(responseEntity.getBody(), responseEntity.getStatusCode());
+    public static ResponseEntity<Object> createJSONWithStatusMessage(ResponseEntity<String> responseEntity) {
+        return createJSONWithStatusMessage(responseEntity.getBody(), responseEntity.getStatusCode());
     }
 }

@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import model.DatabaseConnection;
+import types.AuthTokens;
 
 public class AuthTokenServiceTest {
 
@@ -109,8 +110,8 @@ public class AuthTokenServiceTest {
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
         assertEquals(HttpStatus.OK, createUserStatus.getStatusCode());
 
-        String accessAndRefreshTokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        assertNotNull(accessAndRefreshTokens);
+        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
+        assertNotNull(tokens);
     }
 
     @Test
@@ -141,15 +142,13 @@ public class AuthTokenServiceTest {
     public void testVerifyRefreshToken() {
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
-        String accessAndRefreshTokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        String accessToken = accessAndRefreshTokens.split(",")[0];
-        String refreshToken = accessAndRefreshTokens.split(",")[1];
+        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
 
-        Boolean accessTokenValid = authTokenService.verifyAccessToken("userId", accessToken);
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", refreshToken);
+        Boolean accessTokenValid = authTokenService.verifyAccessToken("userId", tokens.accessToken);
+        tokens = authTokenService.verifyRefreshToken("userId", tokens.refreshToken);
 
         assertTrue(accessTokenValid);
-        assertNotNull(accessAndRefreshTokens);
+        assertNotNull(tokens);
     }
 
     @Test
@@ -157,22 +156,22 @@ public class AuthTokenServiceTest {
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
         // generate access and refresh tokens
-        String accessAndRefreshTokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        String refreshToken = accessAndRefreshTokens.split(",")[1];
+        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
+        String refreshToken = tokens.refreshToken;
 
         // use the first refresh token. verification should succeed
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNotNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
+        assertNotNull(tokens);
 
-        String newRefreshToken = accessAndRefreshTokens.split(",")[1];
+        String newRefreshToken = tokens.refreshToken;
 
         // reuse the first refresh token. verification should fail and the token family should be revoked
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
+        assertNull(tokens);
 
         // reuse the second refresh token. verification should fail since the token family has been revoked
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
-        assertNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
+        assertNull(tokens);
     }
 
     @Test
@@ -180,31 +179,31 @@ public class AuthTokenServiceTest {
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
         // generate access and refresh tokens
-        String accessAndRefreshTokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        String refreshToken = accessAndRefreshTokens.split(",")[1];
+        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
+        String refreshToken = tokens.refreshToken;
 
         // use the first refresh token from first family. verification should succeed
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNotNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
+        assertNotNull(tokens);
 
         // save the second refresh token from first family
-        String newRefreshToken = accessAndRefreshTokens.split(",")[1];
+        String newRefreshToken = tokens.refreshToken;
 
         // reuse the first refresh token from first family. verification should fail and the token family should be revoked
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
+        assertNull(tokens);
 
         // generate access and refresh tokens from a new token family
-        accessAndRefreshTokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        assertNotNull(accessAndRefreshTokens);
-        refreshToken = accessAndRefreshTokens.split(",")[1];
+        tokens = authTokenService.generateAccessAndRefreshTokens("userId");
+        assertNotNull(tokens);
+        refreshToken = tokens.refreshToken;
 
         // use the new refresh token from second family. verification should succeed
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNotNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
+        assertNotNull(tokens);
 
         // use the second refresh token from first family. verification should fail since the token family has been revoked
-        accessAndRefreshTokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
-        assertNull(accessAndRefreshTokens);
+        tokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
+        assertNull(tokens);
     }
 }
