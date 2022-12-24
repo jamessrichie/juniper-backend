@@ -81,7 +81,7 @@ CREATE TABLE tbl_relationships
     user_id             varchar(36) NOT NULL,
     friend_user_id      varchar(36) NOT NULL,
     relationship_status varchar(32) NOT NULL,
-    rating              int,r
+    rating              int,
 
     PRIMARY KEY (user_id, friend_user_id),
     FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
