@@ -8,8 +8,8 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import model.*;
-import helpers.*;
 import services.*;
+import static helpers.Utilities.*;
 
 @RestController
 @RequestMapping("/user")
@@ -54,7 +54,7 @@ public class UserController {
         // check that the email is not in use
         ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
         if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
-            return Utilities.createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
+            return createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
         }
 
         String userId = UUID.randomUUID().toString();
@@ -64,7 +64,7 @@ public class UserController {
         // creates the user
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
         if (createUserStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
+            return createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
         }
         // on success, send verification email
         return mailService.sendVerificationEmail(name, email, verificationCode);
@@ -89,14 +89,14 @@ public class UserController {
         // gets the name of the user
         ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
         if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createStatusJSON(resolveEmailToUserNameStatus);
+            return createStatusJSON(resolveEmailToUserNameStatus);
         }
         String name = resolveEmailToUserNameStatus.getBody();
 
         // gets the verification code for the user
         ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
         if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
+            return createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
         }
         String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
 
@@ -118,22 +118,22 @@ public class UserController {
 
         return switch (processVerificationCodeStatus.getStatusCode()) {
             case OK -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification/verification_success_page.html").replace("[[year]]",
+                    loadTemplate("verification/verification_success_page.html").replace("[[year]]",
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     HttpStatus.OK);
 
             case BAD_REQUEST -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification/already_verified_page.html").replace("[[year]]",
+                    loadTemplate("verification/already_verified_page.html").replace("[[year]]",
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     HttpStatus.BAD_REQUEST);
 
             case GONE -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification/verification_expired_page.html").replace("[[year]]",
+                    loadTemplate("verification/verification_expired_page.html").replace("[[year]]",
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     HttpStatus.GONE);
 
             default -> new ResponseEntity<>(
-                    Utilities.loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
+                    loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
                                            String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                     processVerificationCodeStatus.getStatusCode());
         };
@@ -158,7 +158,7 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         String userHandle = payload.get("userHandle");
@@ -166,7 +166,7 @@ public class UserController {
         String email = payload.get("email").toLowerCase();
         String dateOfBirth = payload.get("dateOfBirth");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name,
+        return createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name,
                                                                                        email, dateOfBirth));
     }
 
@@ -189,7 +189,7 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         String universityId = payload.get("universityId");
@@ -197,7 +197,7 @@ public class UserController {
         String standing = payload.get("standing");
         String gpa = payload.get("gpa");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityId, major, standing, gpa));
+        return createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityId, major, standing, gpa));
     }
 
     /**
@@ -219,13 +219,13 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         String universityId = payload.get("universityId").toString();
         List<String> courses = (List<String>) payload.get("courses");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityId, courses));
+        return createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityId, courses));
     }
 
     /**
@@ -247,12 +247,12 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         String biography = payload.get("biography");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updateBiography(userId, biography));
+        return createStatusJSON(dbconn.transaction_updateBiography(userId, biography));
     }
 
     /**
@@ -274,12 +274,12 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         String cardColor = payload.get("cardColor");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updateCardColor(userId, cardColor));
+        return createStatusJSON(dbconn.transaction_updateCardColor(userId, cardColor));
     }
 
     /**
@@ -301,12 +301,12 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         List<String> mediaUrls = (List<String>) payload.get("mediaUrls");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updateMedia(userId, mediaUrls));
+        return createStatusJSON(dbconn.transaction_updateMedia(userId, mediaUrls));
     }
 
     /**
@@ -328,12 +328,12 @@ public class UserController {
 
         // verifies access token
         if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
         }
 
         String profilePictureUrl = payload.get("profilePictureUrl");
 
-        return Utilities.createStatusJSON(dbconn.transaction_updateProfilePicture(userId, profilePictureUrl));
+        return createStatusJSON(dbconn.transaction_updateProfilePicture(userId, profilePictureUrl));
     }
 
     /**
