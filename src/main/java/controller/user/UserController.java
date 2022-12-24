@@ -4,14 +4,12 @@ import java.io.*;
 import java.sql.*;
 import java.util.*;
 
-import org.apache.commons.text.WordUtils;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import model.*;
 import helpers.*;
 import services.*;
-import exceptions.*;
 
 @RestController
 @RequestMapping("/user")
@@ -49,24 +47,24 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> createUser(@RequestBody Map<String, String> payload) {
 
-        String name = WordUtils.capitalizeFully(payload.get("name"));
+        String name = payload.get("name");
         String email = payload.get("email").toLowerCase();
         String password = payload.get("password");
 
         // check that the email is not in use
         ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
         if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
-            return Utilities.createJSONWithStatusMessage("Email is already in use", HttpStatus.BAD_REQUEST);
+            return Utilities.createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
         }
 
         String userId = UUID.randomUUID().toString();
         String userHandle = generateUserHandle(name);
-        String verificationCode = generateVerificationCode(64);
+        String verificationCode = generateBase62String(64);
 
         // creates the user
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
         if (createUserStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONWithStatusMessage("Failed to create user", createUserStatus.getStatusCode());
+            return Utilities.createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
         }
         // on success, send verification email
         return mailService.sendVerificationEmail(name, email, verificationCode);
@@ -91,14 +89,14 @@ public class UserController {
         // gets the name of the user
         ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
         if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONWithStatusMessage(resolveEmailToUserNameStatus);
+            return Utilities.createStatusJSON(resolveEmailToUserNameStatus);
         }
         String name = resolveEmailToUserNameStatus.getBody();
 
         // gets the verification code for the user
         ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
         if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONWithStatusMessage("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
+            return Utilities.createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
         }
         String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
 
@@ -107,7 +105,7 @@ public class UserController {
     }
 
     /**
-     * Verifies a user's email and redirects them to a status page
+     * Verifies the user's email and redirects them to a status page
      *
      * @apiNote GET request
      * @return HTML page. 200 status code iff success
@@ -142,30 +140,207 @@ public class UserController {
     }
 
     /**
-     * Records changes to the user's profile
+     * Updates the user's personal information
      *
-     * @return true iff operation succeeds
+     * @param payload JSON object containing "userId", "accessToken", "userHandle", "name", "email", "dateOfBirth" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
      */
     @RequestMapping(path = "/update-personal-info",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
-    public ResponseEntity<String> updatePersonalInformation(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Object> updatePersonalInformation(@RequestBody Map<String, String> payload) {
 
-        // Overview
-        // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
-        // assert that userId and password matches those stored
-        // in the database before updating the associated profile
-        // ––––––––––––––––––––––––––––––––––––––––––––––––––––––
+        String userId = payload.get("userId");
+        String accessToken = payload.get("accessToken");
 
-        throw new NotYetImplementedException();
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        String userHandle = payload.get("userHandle");
+        String name = payload.get("name");
+        String email = payload.get("email").toLowerCase();
+        String dateOfBirth = payload.get("dateOfBirth");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name,
+                                                                                       email, dateOfBirth));
+    }
+
+    /**
+     * Updates the user's education information
+     *
+     * @param payload JSON object containing "userId", "accessToken", "universityId", "major", "standing", "gpa" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-education-info",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateEducationInformation(@RequestBody Map<String, String> payload) {
+
+        String userId = payload.get("userId");
+        String accessToken = payload.get("accessToken");
+
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        String universityId = payload.get("universityId");
+        String major = payload.get("major");
+        String standing = payload.get("standing");
+        String gpa = payload.get("gpa");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityId, major, standing, gpa));
+    }
+
+    /**
+     * Updates the user's course registration information
+     *
+     * @param payload JSON object containing "userId", "accessToken", "universityId", "courses[]" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-registration-info",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateRegistrationInformation(@RequestBody Map<String, Object> payload) {
+
+        String userId = payload.get("userId").toString();
+        String accessToken = payload.get("accessToken").toString();
+
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        String universityId = payload.get("universityId").toString();
+        List<String> courses = (List<String>) payload.get("courses");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityId, courses));
+    }
+
+    /**
+     * Updates the user's biography
+     *
+     * @param payload JSON object containing "userId", "accessToken", "biography" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-biography",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateBiography(@RequestBody Map<String, String> payload) {
+
+        String userId = payload.get("userId");
+        String accessToken = payload.get("accessToken");
+
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        String biography = payload.get("biography");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updateBiography(userId, biography));
+    }
+
+    /**
+     * Updates the user's card color
+     *
+     * @param payload JSON object containing "userId", "accessToken", "cardColor" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-card-color",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateCardColor(@RequestBody Map<String, String> payload) {
+
+        String userId = payload.get("userId");
+        String accessToken = payload.get("accessToken");
+
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        String cardColor = payload.get("cardColor");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updateCardColor(userId, cardColor));
+    }
+
+    /**
+     * Updates the user's media
+     *
+     * @param payload JSON object containing "userId", "accessToken", "mediaUrls[]" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-media",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateMedia(@RequestBody Map<String, Object> payload) {
+
+        String userId = payload.get("userId").toString();
+        String accessToken = payload.get("accessToken").toString();
+
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        List<String> mediaUrls = (List<String>) payload.get("mediaUrls");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updateMedia(userId, mediaUrls));
+    }
+
+    /**
+     * Updates the user's profile picture
+     *
+     * @param payload JSON object containing "userId", "accessToken", "profilePictureUrl" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-profile-pic",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateProfilePicture(@RequestBody Map<String, String> payload) {
+
+        String userId = payload.get("userId");
+        String accessToken = payload.get("accessToken");
+
+        // verifies access token
+        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+            return Utilities.createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+        }
+
+        String profilePictureUrl = payload.get("profilePictureUrl");
+
+        return Utilities.createStatusJSON(dbconn.transaction_updateProfilePicture(userId, profilePictureUrl));
     }
 
     /**
      * Generates a unique user handle from a name
      */
     private String generateUserHandle(String name) {
-        String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
+        String userHandle = name.replaceAll("\\s", "") + "#" + String.format("%04d", new Random().nextInt(10000));
 
         // check that user handle is unique
         while (dbconn.transaction_userHandleToUserId(userHandle).getBody() != null) {
@@ -175,19 +350,18 @@ public class UserController {
     }
 
     /**
-     * Generates a random string of specified length
+     * Generates a random base62 string of specified length
      */
-    private String generateVerificationCode(int length) {
-        int leftLimit = 97;
+    private String generateBase62String(int length) {
+        int leftLimit = 48;
         int rightLimit = 122;
 
         Random random = new Random();
-        StringBuilder buffer = new StringBuilder(length);
 
-        for (int i = 0; i < length; i++) {
-            int randomLimitedInt = leftLimit + (int) (random.nextFloat() * (rightLimit - leftLimit + 1));
-            buffer.append((char) randomLimitedInt);
-        }
-        return buffer.toString();
+        return random.ints(leftLimit, rightLimit + 1)
+          .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
+          .limit(length)
+          .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+          .toString();
     }
 }

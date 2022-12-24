@@ -12,6 +12,7 @@ import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
 import exceptions.*;
+import static model.Statements.*;
 
 public class DatabaseConnection {
 
@@ -31,80 +32,39 @@ public class DatabaseConnection {
     // Number of attempts when encountering deadlock
     private static final int MAX_ATTEMPTS = 16;
 
-    // Creates a user
-    private static final String CREATE_USER = "INSERT INTO tbl_users " +
-                                              "VALUES (?, ?, ?, ?, ?, ?, null, null, null, ?, UTC_TIMESTAMP(), false, " +
-                                              "false, null, null, null, null, null, null, null, null, null, null)";
-    private PreparedStatement createUserStatement;
+    // Create statements
+    public PreparedStatement createCourseStatement;
+    public PreparedStatement createMediaStatement;
+    public PreparedStatement createRegistrationStatement;
+    public PreparedStatement createRelationshipStatement;
+    public PreparedStatement createUserStatement;
 
-    // Sets a user's salt and hash fields
-    private static final String UPDATE_CREDENTIALS = "UPDATE tbl_users " +
-                                                     "SET salt = ?, hash = ? " +
-                                                     "WHERE user_id = ?";
-    private PreparedStatement updateCredentialsStatement;
+    // Delete statements
+    public PreparedStatement deleteMediaStatement;
+    public PreparedStatement deleteRegistrationStatement;
 
-    // Sets a user's has_verified_email field
-    private static final String UPDATE_EMAIL_VERIFICATION = "UPDATE tbl_users " +
-                                                            "SET has_verified_email = ? " +
-                                                            "WHERE verification_code = ?";
-    private PreparedStatement updateEmailVerificationStatement;
+    // Update statements
+    public PreparedStatement updateBiographyStatement;
+    public PreparedStatement updateCardColorStatement;
+    public PreparedStatement updateCredentialsStatement;
+    public PreparedStatement updateEducationInformationStatement;
+    public PreparedStatement updateEmailVerificationStatement;
+    public PreparedStatement updatePersonalInformationStatement;
+    public PreparedStatement updateProfilePictureStatement;
+    public PreparedStatement updateRefreshTokenStatement;
+    public PreparedStatement updateRelationshipStatement;
 
-    // Sets a user's user_handle, user_name, email, date_of_birth, city, state, and country fields
-    private static final String UPDATE_PERSONAL = "UPDATE tbl_users " +
-                                                  "SET user_handle = ?, user_name = ?, " +
-                                                  "email = ?, date_of_birth = ?, " +
-                                                  "city = ?, state = ?, " +
-                                                  "country = ? " +
-                                                  "WHERE user_id = ?";
-    private PreparedStatement updatePersonalStatement;
+    // Select statements
+    public PreparedStatement resolveCourseIdUniversityIdToCourseRecordStatement;
+    public PreparedStatement resolveEmailToUserRecordStatement;
+    public PreparedStatement resolveUserHandleToUserRecordStatement;
+    public PreparedStatement resolveUserIdFriendUserIdToRecordStatement;
+    public PreparedStatement resolveUserIdToUserRecordStatement;
 
-    // Sets a user's profile_picture_url field
-    private static final String UPDATE_PROFILE_PICTURE = "UPDATE tbl_users " +
-                                                         "SET profile_picture_url = ? " +
-                                                         "WHERE user_id = ?";
-    private PreparedStatement updateProfilePictureStatement;
-
-    // Sets a user's refresh_token_id and refresh_token_family fields
-    private static final String UPDATE_REFRESH_TOKEN = "UPDATE tbl_users " +
-                                                       "SET refresh_token_id = ?, refresh_token_family = ? " +
-                                                       "WHERE user_id = ?";
-    private PreparedStatement updateRefreshTokenStatement;
-
-    // Gets the user record for an email
-    private static final String RESOLVE_EMAIL_TO_USER_RECORD = "SELECT * FROM tbl_users " +
-                                                               "WHERE email = ?";
-    private PreparedStatement resolveEmailToUserRecordStatement;
-
-    // Gets the user record for a user_handle
-    private static final String RESOLVE_USER_HANDLE_TO_USER_RECORD = "SELECT * FROM tbl_users " +
-                                                                     "WHERE user_handle = ?";
-    private PreparedStatement resolveUserHandleToUserRecordStatement;
-
-    // Gets the user record for a user_id
-    private static final String RESOLVE_USER_ID_TO_USER_RECORD = "SELECT * FROM tbl_users " +
-                                                                 "WHERE user_id = ?";
-    private PreparedStatement resolveUserIdToUserRecordStatement;
-
-    // Checks if the email has been verified
-    private static final String CHECK_EMAIL_VERIFICATION = "SELECT has_verified_email FROM tbl_users " +
-                                                           "WHERE email = ?";
-    private PreparedStatement checkEmailVerificationStatement;
-
-    // Checks if verification code is active. If false, then either code has been used, or has expired
-    private static final String CHECK_VERIFICATION_CODE_ACTIVE = "SELECT EXISTS(" +
-                                                                     "SELECT * FROM tbl_users " +
-                                                                     "WHERE verification_code = ? " +
-                                                                     "AND has_verified_email = 0) " +
-                                                                 "AS verification_code_active";
-    private PreparedStatement checkVerificationCodeActiveStatement;
-
-    // Checks if verification code has been used. If false, then either code is still active, or has expired
-    private static final String CHECK_VERIFICATION_CODE_USED = "SELECT EXISTS(" +
-                                                                   "SELECT * FROM tbl_users " +
-                                                                   "WHERE verification_code = ? " +
-                                                                   "AND has_verified_email = 1) " +
-                                                                "AS verification_code_used";
-    private PreparedStatement checkVerificationCodeUsedStatement;
+    // Boolean statements
+    public PreparedStatement checkEmailVerificationStatement;
+    public PreparedStatement checkVerificationCodeActiveStatement;
+    public PreparedStatement checkVerificationCodeUsedStatement;
 
     /**
      * Creates a connection to the database specified in dbconn.credentials
@@ -169,21 +129,35 @@ public class DatabaseConnection {
      */
     private void prepareStatements() throws SQLException {
         // Create statements
+        createCourseStatement = conn.prepareStatement(CREATE_COURSE);
+        createMediaStatement = conn.prepareStatement(CREATE_MEDIA);
+        createRegistrationStatement = conn.prepareStatement(CREATE_REGISTRATION);
+        createRelationshipStatement = conn.prepareStatement(CREATE_RELATIONSHIP);
         createUserStatement = conn.prepareStatement(CREATE_USER);
 
+        // Delete statements
+        deleteMediaStatement = conn.prepareStatement(DELETE_MEDIA);
+        deleteRegistrationStatement = conn.prepareStatement(DELETE_REGISTRATION);
+
         // Update statements
+        updateBiographyStatement = conn.prepareStatement(UPDATE_BIOGRAPHY);
+        updateCardColorStatement = conn.prepareStatement(UPDATE_CARD_COLOR);
         updateCredentialsStatement = conn.prepareStatement(UPDATE_CREDENTIALS);
+        updateEducationInformationStatement = conn.prepareStatement(UPDATE_EDUCATION_INFORMATION);
         updateEmailVerificationStatement = conn.prepareStatement(UPDATE_EMAIL_VERIFICATION);
-        updatePersonalStatement = conn.prepareStatement(UPDATE_PERSONAL);
+        updatePersonalInformationStatement = conn.prepareStatement(UPDATE_PERSONAL_INFORMATION);
         updateProfilePictureStatement = conn.prepareStatement(UPDATE_PROFILE_PICTURE);
         updateRefreshTokenStatement = conn.prepareStatement(UPDATE_REFRESH_TOKEN);
+        updateRelationshipStatement = conn.prepareStatement(UPDATE_RELATIONSHIP);
 
         // Select statements
+        resolveCourseIdUniversityIdToCourseRecordStatement = conn.prepareStatement(RESOLVE_COURSE_ID_UNIVERSITY_ID_TO_COURSE_RECORD);
         resolveEmailToUserRecordStatement = conn.prepareStatement(RESOLVE_EMAIL_TO_USER_RECORD);
         resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
+        resolveUserIdFriendUserIdToRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_FRIEND_USER_ID_TO_RECORD);
         resolveUserIdToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_USER_RECORD);
 
-        // Boolean check statements
+        // Boolean statements
         checkEmailVerificationStatement = conn.prepareStatement(CHECK_EMAIL_VERIFICATION);
         checkVerificationCodeActiveStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_ACTIVE);
         checkVerificationCodeUsedStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_USED);
@@ -546,15 +520,77 @@ public class DatabaseConnection {
     /**
      * Updates the user's refresh token
      *
-     * @effect tbl_user (W), acquires lock
+     * @effect tbl_user (W), non-locking
      * @return true / 200 status code iff refresh token has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
+        try {
+            executeUpdate(updateRefreshTokenStatement, refreshTokenId, refreshTokenFamily, userId);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Updates the user's personal information
+     *
+     * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's personal information has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updatePersonalInformation(String userId, String userHandle, String name,
+                                                                         String email, String dateOfBirth) {
+        try {
+            executeUpdate(updatePersonalInformationStatement, userHandle, name, email, dateOfBirth, userId);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Updates the user's education information
+     *
+     * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's education information has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updateEducationInformation(String userId, String universityId, String major,
+                                                                          String standing, String gpa) {
+        try {
+            executeUpdate(updateEducationInformationStatement, universityId, major, standing, gpa, userId);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Updates the user's course registration information
+     *
+     * @effect tbl_courses (RW), tbl_registration (W), acquires lock
+     * @return true / 200 status iff user's course registration information has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updateRegistrationInformation(String userId, String universityId, List<String> courses) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                executeUpdate(updateRefreshTokenStatement, refreshTokenId, refreshTokenFamily, userId);
+                executeUpdate(deleteRegistrationStatement, userId);
+
+                for (String courseId : courses) {
+
+                    ResultSet resolveCourseIdUniversityIdToCourseRecordRS = executeQuery(resolveCourseIdUniversityIdToCourseRecordStatement,
+                                                                                         courseId, universityId);
+                    if (!resolveCourseIdUniversityIdToCourseRecordRS.next()) {
+                        executeUpdate(createCourseStatement, courseId, universityId);
+                    }
+                    resolveCourseIdUniversityIdToCourseRecordRS.close();
+
+                    executeUpdate(createRegistrationStatement, userId, courseId, universityId);
+                }
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
@@ -571,19 +607,55 @@ public class DatabaseConnection {
     }
 
     /**
-     * Updates the user's personal information
+     * Updates the user's biography
      *
-     * @effect tbl_user (W), acquires lock
-     * @return true / 200 status iff user's personal information has been successfully updated
+     * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's biography has been successfully updated
      */
-    public ResponseEntity<Boolean> transaction_updateUserPersonalInfo(String userId, String userHandle, String name,
-                                                                      String email, String dateOfBirth, String city,
-                                                                      String state, String country) {
+    public ResponseEntity<Boolean> transaction_updateBiography(String userId, String biography) {
+        try {
+            executeUpdate(updateBiographyStatement, biography, userId);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Updates the user's card color
+     *
+     * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's card color has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updateCardColor(String userId, String cardColor) {
+        try {
+            executeUpdate(updateCardColorStatement, cardColor, userId);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Updates the user's media
+     *
+     * @effect tbl_media (W), acquires lock
+     * @return true / 200 status iff user's media has been successfully updated
+     */
+    public ResponseEntity<Boolean> transaction_updateMedia(String userId, List<String> mediaUrls) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                executeUpdate(updatePersonalStatement, userHandle, name, email, dateOfBirth, city, state, country, userId);
+                executeUpdate(deleteMediaStatement, userId);
+
+                for (int i = 0; i < mediaUrls.size(); i++) {
+                    String mediaUrl = mediaUrls.get(i);
+
+                    executeUpdate(createMediaStatement, userId, i, mediaUrl);
+                }
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
@@ -602,15 +674,36 @@ public class DatabaseConnection {
     /**
      * Updates the user's profile picture
      *
-     * @effect tbl_user (W), acquires lock
-     * @return true iff user's profile picture has been successfully updated
+     * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's profile picture has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateProfilePicture(String userId, String profilePictureUrl) {
+        try {
+            executeUpdate(updateProfilePictureStatement, profilePictureUrl, userId);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * User rates friend
+     *
+     * @effect tbl_relationships (RW), acquires lock
+     * @return true / 200 status iff successfully rated friend
+     */
+    public ResponseEntity<Boolean> transaction_rateUser(String userId, String friendUserId, int rating) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                executeUpdate(updateProfilePictureStatement, profilePictureUrl, userId);
+                ResultSet resolveUserIdFriendUserIdToRecordRS = executeQuery(resolveUserIdFriendUserIdToRecordStatement, userId, friendUserId);
+                if (!resolveUserIdFriendUserIdToRecordRS.next() || !resolveUserIdFriendUserIdToRecordRS.getString("relationship_status").equals("friends")) {
+                    return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
+                }
+
+                executeUpdate(updateRelationshipStatement, "friends", rating, userId, friendUserId);
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
@@ -626,19 +719,26 @@ public class DatabaseConnection {
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
+    /**
+     * User likes other user
+     *
+     * @effect tbl_relationships (W), acquires lock
+     * @return relationship_status / 200 status if successfully liked other user
+     */
+    public ResponseEntity<String> transaction_likeUser(String userId, String friendUserId) {
+        // if friend likes user
+        //      user and friend are friends
+        //      friend and user are friends
+        // else
+        //      user and friend are liked
+        throw new NotYetImplementedException();
+    }
+
+    public ResponseEntity<Boolean> transaction_dislikeUser() {
+        throw new NotYetImplementedException();
+    }
+
     public List<String> transaction_loadUsers() {
-        throw new NotYetImplementedException();
-    }
-
-    public Boolean transaction_rateUser() {
-        throw new NotYetImplementedException();
-    }
-
-    public Boolean transaction_likeUser() {
-        throw new NotYetImplementedException();
-    }
-
-    public Boolean transaction_dislikeUser() {
         throw new NotYetImplementedException();
     }
 
@@ -730,10 +830,10 @@ public class DatabaseConnection {
     }
 
     /**
-     * Sets the query's parameters to the method's arguments in the order they are passed in
+     * Sets the statement's parameters to the method's arguments in the order they are passed in
      *
-     * @param statement canned SQL query
-     * @param args query parameters
+     * @param statement canned SQL statement
+     * @param args statement parameters
      */
     private void setParameters(PreparedStatement statement, Object... args) throws SQLException {
         int parameterIndex = 1;
@@ -751,8 +851,8 @@ public class DatabaseConnection {
     /**
      * Executes the query statement with the specified parameters
      *
-     * @param statement canned SQL query
-     * @param args query parameters
+     * @param statement canned SQL statement
+     * @param args statement parameters
      * @return query results as a ResultSet
      */
     private ResultSet executeQuery(PreparedStatement statement, Object... args) throws SQLException {
@@ -764,7 +864,7 @@ public class DatabaseConnection {
      * Executes the update statement with the specified parameters
      *
      * @param statement canned SQL statement
-     * @param args query parameters
+     * @param args statement parameters
      */
     private void executeUpdate(PreparedStatement statement, Object... args) throws SQLException {
         setParameters(statement, args);
