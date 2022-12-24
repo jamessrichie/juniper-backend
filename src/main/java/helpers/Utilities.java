@@ -39,14 +39,14 @@ public final class Utilities {
     /**
      * Generates a JSON object containing a status message
      */
-    public static ResponseEntity<Object> createJSONWithStatusMessage(String status, HttpStatus statusCode) {
+    public static ResponseEntity<Object> createStatusJSON(String status, HttpStatus statusCode) {
         return new ResponseEntity<>(generateMap("status", status), statusCode);
     }
 
     /**
      * Generates a JSON object containing a status message
      */
-    public static ResponseEntity<Object> createJSONWithStatusMessage(ResponseEntity<String> responseEntity) {
-        return createJSONWithStatusMessage(responseEntity.getBody(), responseEntity.getStatusCode());
+    public static <T> ResponseEntity<Object> createStatusJSON(ResponseEntity<T> responseEntity) {
+        return createStatusJSON(responseEntity.getBody().toString(), responseEntity.getStatusCode());
     }
 }

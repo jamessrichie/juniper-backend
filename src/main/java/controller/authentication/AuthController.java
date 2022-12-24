@@ -49,22 +49,22 @@ public class AuthController {
         String email = payload.get("email").toLowerCase();
         String password = payload.get("password");
 
-        // check that the email has been verified
-        ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
-        if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
-            return Utilities.createJSONWithStatusMessage("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
-        }
-
         // check that the credentials are correct
         ResponseEntity<Boolean> verifyCredentialsStatus = dbconn.transaction_verifyCredentials(email, password);
         if (Boolean.FALSE.equals(verifyCredentialsStatus.getBody())) {
-            return Utilities.createJSONWithStatusMessage("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            return Utilities.createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+        }
+
+        // check that the email has been verified
+        ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
+        if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
+            return Utilities.createStatusJSON("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
         }
 
         // get the userId for token generation
         ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
         if (resolveEmailToUserIdStatus.getStatusCode() != HttpStatus.OK) {
-            return Utilities.createJSONWithStatusMessage("Failed to verify credentials", HttpStatus.BAD_REQUEST);
+            return Utilities.createStatusJSON("Failed to verify credentials", HttpStatus.BAD_REQUEST);
         }
 
         String userId = resolveEmailToUserIdStatus.getBody();
@@ -93,7 +93,7 @@ public class AuthController {
 
         ResponseEntity<Boolean> updateCredentialsStatus = dbconn.transaction_updateCredentials(userId, password, newPassword);
         if (Boolean.FALSE.equals(updateCredentialsStatus.getBody())) {
-            return Utilities.createJSONWithStatusMessage("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            return Utilities.createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
         }
         return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
@@ -115,9 +115,9 @@ public class AuthController {
         String userId = payload.get("userId");
 
         if (authTokenService.revokeTokens(userId)) {
-            return Utilities.createJSONWithStatusMessage("All tokens revoked", HttpStatus.OK);
+            return Utilities.createStatusJSON("All tokens revoked", HttpStatus.OK);
         } else {
-            return Utilities.createJSONWithStatusMessage("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
+            return Utilities.createStatusJSON("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -144,7 +144,7 @@ public class AuthController {
         if (tokens != null) {
             return new ResponseEntity<>(tokens, HttpStatus.OK);
         } else {
-            return Utilities.createJSONWithStatusMessage("Refresh token rejected", HttpStatus.UNAUTHORIZED);
+            return Utilities.createStatusJSON("Refresh token rejected", HttpStatus.UNAUTHORIZED);
         }
     }
 }

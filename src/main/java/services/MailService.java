@@ -41,7 +41,7 @@ public class MailService {
         props.put("mail.smtp.allow8bitmime", "true");
         props.put("mail.smtps.allow8bitmime", "true");
 
-        executor = new ThreadPoolExecutor(10, 10, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        executor = new ThreadPoolExecutor(5, 20, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
     }
 
     /**
@@ -87,10 +87,10 @@ public class MailService {
 
             sendEmail(toAddress, subject, content);
 
-            return Utilities.createJSONWithStatusMessage("Successfully sent verification email", HttpStatus.OK);
+            return Utilities.createStatusJSON("Successfully sent verification email", HttpStatus.OK);
 
         } catch (Exception e) {
-            return Utilities.createJSONWithStatusMessage("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
+            return Utilities.createStatusJSON("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
