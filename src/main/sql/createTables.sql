@@ -34,15 +34,12 @@ CREATE TABLE tbl_users
     verification_timestamp datetime      NOT NULL,
     has_verified_email     boolean       NOT NULL,
     has_valid_profile      boolean       NOT NULL,
-    background_color       varchar(15),
+    card_color             varchar(15),
     date_of_birth          date,
     university_id          varchar(36),
     major                  varchar(64),
     standing               varchar(32),
-    gpa                    float,
-    city                   varchar(128),
-    state                  varchar(128),
-    country                varchar(128),
+    gpa                    varchar(4),
     biography              text,
 
     PRIMARY KEY (user_id),
@@ -84,7 +81,7 @@ CREATE TABLE tbl_relationships
     user_id             varchar(36) NOT NULL,
     friend_user_id      varchar(36) NOT NULL,
     relationship_status varchar(32) NOT NULL,
-    rating              int,
+    rating              int,r
 
     PRIMARY KEY (user_id, friend_user_id),
     FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
