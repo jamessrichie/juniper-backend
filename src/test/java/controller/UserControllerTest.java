@@ -1,3 +1,4 @@
+/*
 package controller;
 
 import java.io.*;
@@ -16,3 +17,4 @@ import model.*;
 public final class UserControllerTest extends ControllerTest {
 
 }
+*/

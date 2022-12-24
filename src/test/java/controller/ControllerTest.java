@@ -1,3 +1,4 @@
+/*
 package controller;
 
 import java.io.*;
@@ -67,3 +68,4 @@ public class ControllerTest {
         sendPOST("/user/createUser", parameters);
     }
 }
+*/
