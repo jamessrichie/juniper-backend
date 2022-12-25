@@ -15,8 +15,6 @@ import org.springframework.util.ResourceUtils;
 import model.*;
 import types.AuthTokens;
 
-import javax.xml.crypto.Data;
-
 /**
  * Consult section 1.5 of the following standard for further details <br>
  * <a href="https://www.rfc-editor.org/rfc/rfc6749#section-1.5">The OAuth 2.0 Authorization Framework</a> <br><br>

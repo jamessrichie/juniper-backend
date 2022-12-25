@@ -3,14 +3,19 @@ package model;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.*;
 
+/**
+ * DatabaseConnectionPool represents a pool of DatabaseConnections
+ * Initialization of the pool is slow (about 1 second per connection)
+ * but offers significant parallelism and caching improvements
+ */
 public class DatabaseConnectionPool {
 
     private static final int INITIAL_POOL_SIZE = 10;
     private static int MAX_POOL_SIZE = 20;
 
     private static final Lock lock;
-    private static BlockingQueue<DatabaseConnection> idleConnections;
-    private static BlockingQueue<DatabaseConnection> activeConnections;
+    private static final BlockingQueue<DatabaseConnection> idleConnections;
+    private static final BlockingQueue<DatabaseConnection> activeConnections;
 
 
     static {

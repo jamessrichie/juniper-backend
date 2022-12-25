@@ -1,17 +1,9 @@
 package model;
 
-import java.io.*;
-import java.sql.*;
 import java.util.*;
-import java.time.*;
-import java.time.temporal.*;
-import java.util.concurrent.TimeUnit;
-
 import org.junit.*;
 import org.junit.rules.*;
 import static org.junit.Assert.*;
-
-import model.*;
 
 public class DatabaseConnectionPoolTest {
 
