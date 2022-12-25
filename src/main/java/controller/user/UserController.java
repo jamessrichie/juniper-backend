@@ -12,7 +12,7 @@ import services.*;
 import static helpers.Utilities.*;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/v1.0/user")
 public class UserController {
 
     // Database connection
@@ -46,7 +46,6 @@ public class UserController {
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
     public ResponseEntity<Object> createUser(@RequestBody Map<String, String> payload) {
-
         String name = payload.get("name");
         String email = payload.get("email").toLowerCase();
         String password = payload.get("password");

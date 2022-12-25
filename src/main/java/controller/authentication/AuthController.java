@@ -13,7 +13,7 @@ import types.AuthTokens;
 import static helpers.Utilities.*;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/v1.0/auth")
 public class AuthController {
 
     // Database connection
