@@ -21,13 +21,12 @@ import types.AuthTokens;
 public class AuthTokenServiceTest {
 
     @Rule
-    public Timeout globalTimeout = Timeout.seconds(10);
+    public final Timeout globalTimeout = Timeout.seconds(10);
+
+    private final Algorithm testAlgorithm = Algorithm.HMAC256("samplePrivateKey");
+    private final JWTVerifier tokenVerifier = JWT.require(testAlgorithm).build();
 
     private Savepoint savepoint;
-
-    private Algorithm testAlgorithm = Algorithm.HMAC256("samplePrivateKey");
-    private JWTVerifier tokenVerifier = JWT.require(testAlgorithm).build();
-
     private static AuthTokenService authTokenService;
     private static DatabaseConnection dbconn;
 
