@@ -12,7 +12,7 @@ import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
 import exceptions.*;
-import static model.Statements.*;
+import static model.DatabaseStatements.*;
 
 public class DatabaseConnection {
 
@@ -222,7 +222,7 @@ public class DatabaseConnection {
                                                                      userHandle);
             if (!resolveUserHandleToUserRecordRS.next()) {
                 resolveUserHandleToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.GONE);
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             }
             String userId = resolveUserHandleToUserRecordRS.getString("user_id");
             resolveUserHandleToUserRecordRS.close();
@@ -246,7 +246,7 @@ public class DatabaseConnection {
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.GONE);
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             }
             String name = resolveEmailToUserRecordRS.getString("user_name");
             resolveEmailToUserRecordRS.close();
@@ -270,7 +270,7 @@ public class DatabaseConnection {
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
-                return new ResponseEntity<>(null, HttpStatus.GONE);
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             }
             String userId = resolveEmailToUserRecordRS.getString("user_id");
             resolveEmailToUserRecordRS.close();
@@ -293,7 +293,7 @@ public class DatabaseConnection {
             // retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
-                return new ResponseEntity<>(null, HttpStatus.GONE);
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             } else if (resolveEmailToUserRecordRS.getBoolean("has_verified_email")) {
                 return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
             }
@@ -319,7 +319,7 @@ public class DatabaseConnection {
             ResultSet checkEmailVerificationRS = executeQuery(checkEmailVerificationStatement, email);
             if (!checkEmailVerificationRS.next()) {
                 checkEmailVerificationRS.close();
-                return new ResponseEntity<>(false, HttpStatus.GONE);
+                return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
             } else if (checkEmailVerificationRS.getBoolean("has_verified_email")) {
                 return new ResponseEntity<>(true, HttpStatus.OK);
             } else {
@@ -359,7 +359,7 @@ public class DatabaseConnection {
                 checkVerificationCodeActiveRS.next();
                 if (!checkVerificationCodeActiveRS.getBoolean("verification_code_active")) {
                     checkVerificationCodeActiveRS.close();
-                    return new ResponseEntity<>(false, HttpStatus.GONE);
+                    return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
                 }
                 checkVerificationCodeActiveRS.close();
 
