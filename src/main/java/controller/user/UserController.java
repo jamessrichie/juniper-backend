@@ -15,11 +15,11 @@ import static helpers.Utilities.*;
 @RequestMapping("/v1.0/user")
 public class UserController {
 
-    // Database connection
-    private final DatabaseConnection dbconn;
-
     // Token authentication service
     private final AuthTokenService authTokenService;
+
+    // Database connection
+    private final DatabaseConnection dbconn;
 
     // Mailing service
     private final MailService mailService;
@@ -27,9 +27,9 @@ public class UserController {
     /**
      * Initializes controller
      */
-    public UserController() throws IOException, SQLException {
-        dbconn = new DatabaseConnection();
+    public UserController() throws IOException {
         authTokenService = new AuthTokenService();
+        dbconn = DatabaseConnectionPool.getConnection();
         mailService = new MailService();
     }
 

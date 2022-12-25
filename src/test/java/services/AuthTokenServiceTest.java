@@ -15,7 +15,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import model.DatabaseConnection;
+import model.*;
 import types.AuthTokens;
 
 public class AuthTokenServiceTest {
@@ -23,32 +23,36 @@ public class AuthTokenServiceTest {
     @Rule
     public final Timeout globalTimeout = Timeout.seconds(10);
 
+
     private final Algorithm testAlgorithm = Algorithm.HMAC256("samplePrivateKey");
     private final JWTVerifier tokenVerifier = JWT.require(testAlgorithm).build();
 
     private Savepoint savepoint;
     private static AuthTokenService authTokenService;
-    private static DatabaseConnection dbconn;
 
     @BeforeClass
-    public static void setUpBeforeClass() throws IOException, SQLException {
-        dbconn = new DatabaseConnection(true);
-        authTokenService = new AuthTokenService(dbconn);
+    public static void setUpBeforeClass() throws IOException {
+        DatabaseConnectionPool.enableTesting();
+        authTokenService = new AuthTokenService();
     }
 
     @AfterClass
-    public static void tearDownAfterClass() throws SQLException {
-        dbconn.closeConnection();
+    public static void tearDownAfterClass() {
+        DatabaseConnectionPool.disableTesting();
     }
 
     @Before
     public void setUpBeforeTest() throws SQLException {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         savepoint = dbconn.createSavepoint();
+        DatabaseConnectionPool.releaseConnection(dbconn);
     }
 
     @After
     public void tearDownAfterTest() throws SQLException {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.revertToSavepoint(savepoint);
+        DatabaseConnectionPool.releaseConnection(dbconn);
     }
 
     @Test
@@ -106,7 +110,10 @@ public class AuthTokenServiceTest {
 
     @Test
     public void testGenerateAccessAndRefreshToken() {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
+        DatabaseConnectionPool.releaseConnection(dbconn);
+
         assertEquals(HttpStatus.OK, createUserStatus.getStatusCode());
 
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
@@ -139,7 +146,9 @@ public class AuthTokenServiceTest {
 
     @Test
     public void testVerifyRefreshToken() {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
+        DatabaseConnectionPool.releaseConnection(dbconn);
 
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
 
@@ -152,7 +161,9 @@ public class AuthTokenServiceTest {
 
     @Test
     public void testRefreshTokenReuseDetection() {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
+        DatabaseConnectionPool.releaseConnection(dbconn);
 
         // generate access and refresh tokens
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
@@ -175,7 +186,9 @@ public class AuthTokenServiceTest {
 
     @Test
     public void testRefreshTokenReuseDetectionNewTokenFamily() {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
+        DatabaseConnectionPool.releaseConnection(dbconn);
 
         // generate access and refresh tokens
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");

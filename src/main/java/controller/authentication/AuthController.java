@@ -1,7 +1,6 @@
 package controller.authentication;
 
 import java.io.*;
-import java.sql.*;
 import java.util.*;
 
 import org.springframework.http.*;
@@ -16,18 +15,18 @@ import static helpers.Utilities.*;
 @RequestMapping("/v1.0/auth")
 public class AuthController {
 
-    // Database connection
-    private final DatabaseConnection dbconn;
-
     // Token authentication service
     private final AuthTokenService authTokenService;
+
+    // Database connection
+    private final DatabaseConnection dbconn;
 
     /**
      * Initializes controller
      */
-    public AuthController() throws IOException, SQLException {
-        dbconn = new DatabaseConnection();
+    public AuthController() throws IOException {
         authTokenService = new AuthTokenService();
+        dbconn = DatabaseConnectionPool.getConnection();
     }
 
     /**
