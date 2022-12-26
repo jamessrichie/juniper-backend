@@ -18,15 +18,11 @@ public class AuthController {
     // Token authentication service
     private final AuthTokenService authTokenService;
 
-    // Database connection
-    private final DatabaseConnection dbconn;
-
     /**
      * Initializes controller
      */
     public AuthController() throws IOException {
         authTokenService = new AuthTokenService();
-        dbconn = DatabaseConnectionPool.getConnection();
     }
 
     /**
@@ -45,29 +41,36 @@ public class AuthController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> verifyUserCredentials(@RequestBody Map<String, String> payload) {
 
-        String email = payload.get("email").toLowerCase();
-        String password = payload.get("password");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // Check that the credentials are correct
-        ResponseEntity<Boolean> verifyCredentialsStatus = dbconn.transaction_verifyCredentials(email, password);
-        if (Boolean.FALSE.equals(verifyCredentialsStatus.getBody())) {
-            return createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+        try {
+            String email = payload.get("email").toLowerCase();
+            String password = payload.get("password");
+
+            // Check that the credentials are correct
+            ResponseEntity<Boolean> verifyCredentialsStatus = dbconn.transaction_verifyCredentials(email, password);
+            if (Boolean.FALSE.equals(verifyCredentialsStatus.getBody())) {
+                return createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            }
+
+            // Check that the email has been verified
+            ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
+            if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
+                return createStatusJSON("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
+            }
+
+            // Get the userId for token generation
+            ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
+            if (resolveEmailToUserIdStatus.getStatusCode() != HttpStatus.OK) {
+                return createStatusJSON("Failed to verify credentials", HttpStatus.BAD_REQUEST);
+            }
+
+            String userId = resolveEmailToUserIdStatus.getBody();
+            return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(dbconn, userId), HttpStatus.OK);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        // Check that the email has been verified
-        ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
-        if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
-            return createStatusJSON("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
-        }
-
-        // Get the userId for token generation
-        ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
-        if (resolveEmailToUserIdStatus.getStatusCode() != HttpStatus.OK) {
-            return createStatusJSON("Failed to verify credentials", HttpStatus.BAD_REQUEST);
-        }
-
-        String userId = resolveEmailToUserIdStatus.getBody();
-        return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
 
     /**
@@ -86,15 +89,22 @@ public class AuthController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateUserCredentials(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String password = payload.get("password");
-        String newPassword = payload.get("newPassword");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        ResponseEntity<Boolean> updateCredentialsStatus = dbconn.transaction_updateCredentials(userId, password, newPassword);
-        if (Boolean.FALSE.equals(updateCredentialsStatus.getBody())) {
-            return createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+        try {
+            String userId = payload.get("userId");
+            String password = payload.get("password");
+            String newPassword = payload.get("newPassword");
+
+            ResponseEntity<Boolean> updateCredentialsStatus = dbconn.transaction_updateCredentials(userId, password, newPassword);
+            if (Boolean.FALSE.equals(updateCredentialsStatus.getBody())) {
+                return createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
+            }
+            return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(dbconn, userId), HttpStatus.OK);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-        return new ResponseEntity<>(authTokenService.generateAccessAndRefreshTokens(userId), HttpStatus.OK);
     }
 
     /**
@@ -111,12 +121,19 @@ public class AuthController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> revokeTokens(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        if (authTokenService.revokeTokens(userId)) {
-            return createStatusJSON("All tokens revoked", HttpStatus.OK);
-        } else {
-            return createStatusJSON("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
+        try {
+            String userId = payload.get("userId");
+
+            if (authTokenService.revokeTokens(dbconn, userId)) {
+                return createStatusJSON("All tokens revoked", HttpStatus.OK);
+            } else {
+                return createStatusJSON("Failed to revoke tokens", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
     }
 
@@ -136,14 +153,21 @@ public class AuthController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> renewTokens(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String refreshToken = payload.get("refreshToken");
-        AuthTokens tokens = authTokenService.verifyRefreshToken(userId, refreshToken);
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        if (tokens != null) {
-            return new ResponseEntity<>(tokens, HttpStatus.OK);
-        } else {
-            return createStatusJSON("Refresh token rejected", HttpStatus.UNAUTHORIZED);
+        try {
+            String userId = payload.get("userId");
+            String refreshToken = payload.get("refreshToken");
+            AuthTokens tokens = authTokenService.verifyRefreshToken(dbconn, userId, refreshToken);
+
+            if (tokens != null) {
+                return new ResponseEntity<>(tokens, HttpStatus.OK);
+            } else {
+                return createStatusJSON("Refresh token rejected", HttpStatus.UNAUTHORIZED);
+            }
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
     }
 }

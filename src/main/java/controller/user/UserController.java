@@ -1,7 +1,6 @@
 package controller.user;
 
 import java.io.*;
-import java.sql.*;
 import java.util.*;
 
 import org.springframework.http.*;
@@ -18,9 +17,6 @@ public class UserController {
     // Token authentication service
     private final AuthTokenService authTokenService;
 
-    // Database connection
-    private final DatabaseConnection dbconn;
-
     // Mailing service
     private final MailService mailService;
 
@@ -29,7 +25,6 @@ public class UserController {
      */
     public UserController() throws IOException {
         authTokenService = new AuthTokenService();
-        dbconn = DatabaseConnectionPool.getConnection();
         mailService = new MailService();
     }
 
@@ -46,27 +41,35 @@ public class UserController {
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
     public ResponseEntity<Object> createUser(@RequestBody Map<String, String> payload) {
-        String name = payload.get("name");
-        String email = payload.get("email").toLowerCase();
-        String password = payload.get("password");
 
-        // check that the email is not in use
-        ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
-        if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
-            return createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            String name = payload.get("name");
+            String email = payload.get("email").toLowerCase();
+            String password = payload.get("password");
+
+            // Check that the email is not in use
+            ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
+            if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
+                return createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
+            }
+
+            String userId = UUID.randomUUID().toString();
+            String userHandle = generateUserHandle(dbconn, name);
+            String verificationCode = generateBase62String(64);
+
+            // Creates the user
+            ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
+            if (createUserStatus.getStatusCode() != HttpStatus.OK) {
+                return createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
+            }
+            // On success, send verification email
+            return mailService.sendVerificationEmail(name, email, verificationCode);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String userId = UUID.randomUUID().toString();
-        String userHandle = generateUserHandle(name);
-        String verificationCode = generateBase62String(64);
-
-        // creates the user
-        ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
-        if (createUserStatus.getStatusCode() != HttpStatus.OK) {
-            return createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
-        }
-        // on success, send verification email
-        return mailService.sendVerificationEmail(name, email, verificationCode);
     }
 
     /**
@@ -83,24 +86,31 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> sendVerificationEmail(@RequestBody Map<String, String> payload) {
 
-        String email = payload.get("email").toLowerCase();
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // gets the name of the user
-        ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
-        if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
-            return createStatusJSON(resolveEmailToUserNameStatus);
+		try {
+            String email = payload.get("email").toLowerCase();
+
+            // Gets the name of the user
+            ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
+            if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
+                return createStatusJSON(resolveEmailToUserNameStatus);
+            }
+            String name = resolveEmailToUserNameStatus.getBody();
+
+            // Gets the verification code for the user
+            ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
+            if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
+                return createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
+            }
+            String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
+
+            // On success, send verification email
+            return mailService.sendVerificationEmail(name, email, verificationCode);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-        String name = resolveEmailToUserNameStatus.getBody();
-
-        // gets the verification code for the user
-        ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
-        if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
-            return createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
-        }
-        String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
-
-        // on success, send verification email
-        return mailService.sendVerificationEmail(name, email, verificationCode);
     }
 
     /**
@@ -113,29 +123,35 @@ public class UserController {
         method = RequestMethod.GET)
     public ResponseEntity<String> processVerificationCode(@RequestParam(value = "code") String verificationCode) {
 
-        ResponseEntity<Boolean> processVerificationCodeStatus = dbconn.transaction_processVerificationCode(verificationCode);
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        return switch (processVerificationCodeStatus.getStatusCode()) {
-            case OK -> new ResponseEntity<>(
-                    loadTemplate("verification/verification_success_page.html").replace("[[year]]",
-                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
-                    HttpStatus.OK);
+		try {
+            ResponseEntity<Boolean> processVerificationCodeStatus = dbconn.transaction_processVerificationCode(verificationCode);
 
-            case BAD_REQUEST -> new ResponseEntity<>(
-                    loadTemplate("verification/already_verified_page.html").replace("[[year]]",
-                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
-                    HttpStatus.BAD_REQUEST);
+            return switch (processVerificationCodeStatus.getStatusCode()) {
+                case OK -> new ResponseEntity<>(
+                        loadTemplate("verification/verification_success_page.html").replace("[[year]]",
+                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.OK);
 
-            case GONE -> new ResponseEntity<>(
-                    loadTemplate("verification/verification_expired_page.html").replace("[[year]]",
-                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
-                    HttpStatus.GONE);
+                case BAD_REQUEST -> new ResponseEntity<>(
+                        loadTemplate("verification/already_verified_page.html").replace("[[year]]",
+                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.BAD_REQUEST);
 
-            default -> new ResponseEntity<>(
-                    loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
-                                           String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
-                    processVerificationCodeStatus.getStatusCode());
-        };
+                case GONE -> new ResponseEntity<>(
+                        loadTemplate("verification/verification_expired_page.html").replace("[[year]]",
+                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.GONE);
+
+                default -> new ResponseEntity<>(
+                        loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
+                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        processVerificationCodeStatus.getStatusCode());
+            };
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
     }
 
     /**
@@ -152,21 +168,27 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updatePersonalInformation(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String accessToken = payload.get("accessToken");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String userHandle = payload.get("userHandle");
+            String name = payload.get("name");
+            String email = payload.get("email").toLowerCase();
+            String dateOfBirth = payload.get("dateOfBirth");
+
+            return createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name,
+                                                                                           email, dateOfBirth));
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String userHandle = payload.get("userHandle");
-        String name = payload.get("name");
-        String email = payload.get("email").toLowerCase();
-        String dateOfBirth = payload.get("dateOfBirth");
-
-        return createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name,
-                                                                                       email, dateOfBirth));
     }
 
     /**
@@ -183,20 +205,27 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateEducationInformation(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String accessToken = payload.get("accessToken");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String universityId = payload.get("universityId");
+            String major = payload.get("major");
+            String standing = payload.get("standing");
+            String gpa = payload.get("gpa");
+
+            return createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityId, major, standing, gpa));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String universityId = payload.get("universityId");
-        String major = payload.get("major");
-        String standing = payload.get("standing");
-        String gpa = payload.get("gpa");
-
-        return createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityId, major, standing, gpa));
     }
 
     /**
@@ -213,18 +242,25 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateRegistrationInformation(@RequestBody Map<String, Object> payload) {
 
-        String userId = payload.get("userId").toString();
-        String accessToken = payload.get("accessToken").toString();
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId").toString();
+            String accessToken = payload.get("accessToken").toString();
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String universityId = payload.get("universityId").toString();
+            List<String> courses = (List<String>) payload.get("courses");
+
+            return createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityId, courses));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String universityId = payload.get("universityId").toString();
-        List<String> courses = (List<String>) payload.get("courses");
-
-        return createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityId, courses));
     }
 
     /**
@@ -241,17 +277,24 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateBiography(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String accessToken = payload.get("accessToken");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String biography = payload.get("biography");
+
+            return createStatusJSON(dbconn.transaction_updateBiography(userId, biography));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String biography = payload.get("biography");
-
-        return createStatusJSON(dbconn.transaction_updateBiography(userId, biography));
     }
 
     /**
@@ -268,17 +311,24 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateCardColor(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String accessToken = payload.get("accessToken");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String cardColor = payload.get("cardColor");
+
+            return createStatusJSON(dbconn.transaction_updateCardColor(userId, cardColor));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String cardColor = payload.get("cardColor");
-
-        return createStatusJSON(dbconn.transaction_updateCardColor(userId, cardColor));
     }
 
     /**
@@ -295,17 +345,24 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateMedia(@RequestBody Map<String, Object> payload) {
 
-        String userId = payload.get("userId").toString();
-        String accessToken = payload.get("accessToken").toString();
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId").toString();
+            String accessToken = payload.get("accessToken").toString();
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            List<String> mediaUrls = (List<String>) payload.get("mediaUrls");
+
+            return createStatusJSON(dbconn.transaction_updateMedia(userId, mediaUrls));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        List<String> mediaUrls = (List<String>) payload.get("mediaUrls");
-
-        return createStatusJSON(dbconn.transaction_updateMedia(userId, mediaUrls));
     }
 
     /**
@@ -322,26 +379,33 @@ public class UserController {
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateProfilePicture(@RequestBody Map<String, String> payload) {
 
-        String userId = payload.get("userId");
-        String accessToken = payload.get("accessToken");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
-        // verifies access token
-        if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-            return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String profilePictureUrl = payload.get("profilePictureUrl");
+
+            return createStatusJSON(dbconn.transaction_updateProfilePicture(userId, profilePictureUrl));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
         }
-
-        String profilePictureUrl = payload.get("profilePictureUrl");
-
-        return createStatusJSON(dbconn.transaction_updateProfilePicture(userId, profilePictureUrl));
     }
 
     /**
      * Generates a unique user handle from a name
      */
-    private String generateUserHandle(String name) {
+    private String generateUserHandle(DatabaseConnection dbconn, String name) {
         String userHandle = name.replaceAll("\\s", "") + "#" + String.format("%04d", new Random().nextInt(10000));
 
-        // check that user handle is unique
+        // Check that user handle is unique
         while (dbconn.transaction_userHandleToUserId(userHandle).getBody() != null) {
             userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
         }

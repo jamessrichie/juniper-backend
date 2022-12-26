@@ -8,7 +8,6 @@ import java.time.temporal.*;
 import com.auth0.jwt.*;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import model.DatabaseConnectionPool;
 import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
@@ -107,8 +106,8 @@ public class AuthTokenService {
      *
      * @return comma-separated signed JSON Web Tokens
      */
-    public AuthTokens generateAccessAndRefreshTokens(String userId) {
-        return generateAccessAndRefreshTokens(userId, UUID.randomUUID().toString());
+    public AuthTokens generateAccessAndRefreshTokens(DatabaseConnection dbconn, String userId) {
+        return generateAccessAndRefreshTokens(dbconn, userId, UUID.randomUUID().toString());
     }
 
     /**
@@ -116,7 +115,7 @@ public class AuthTokenService {
      *
      * @return comma-separated signed JSON Web Tokens
      */
-    public AuthTokens generateAccessAndRefreshTokens(String userId, String refreshTokenFamily) {
+    public AuthTokens generateAccessAndRefreshTokens(DatabaseConnection dbconn, String userId, String refreshTokenFamily) {
         String refreshTokenId = UUID.randomUUID().toString();
 
         String accessToken = generateAccessToken(userId);
@@ -125,9 +124,7 @@ public class AuthTokenService {
         if (accessToken == null || refreshToken == null) {
             return null;
         }
-        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         ResponseEntity<Boolean> updateRefreshTokenStatus = dbconn.transaction_updateRefreshToken(userId, refreshTokenId, refreshTokenFamily);
-        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         if (updateRefreshTokenStatus.getStatusCode() != HttpStatus.OK) {
             return null;
@@ -162,7 +159,7 @@ public class AuthTokenService {
      *
      * @return if valid, then return a new access and refresh token. otherwise return null
      */
-    public AuthTokens verifyRefreshToken(String userId, String token) {
+    public AuthTokens verifyRefreshToken(DatabaseConnection dbconn, String userId, String token) {
         try {
             DecodedJWT decodedToken = refreshTokenVerifier.verify(token);
 
@@ -173,21 +170,16 @@ public class AuthTokenService {
             String tokenId = decodedToken.getId();
             String tokenFamily = decodedToken.getClaim("token_family").asString();
 
-            DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
             ResponseEntity<Boolean> verifyRefreshTokenIdStatus = dbconn.transaction_verifyRefreshTokenId(userId, tokenId);
             ResponseEntity<Boolean> verifyRefreshTokenFamilyStatus = dbconn.transaction_verifyRefreshTokenFamily(userId, tokenFamily);
-            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
             if (Boolean.TRUE.equals(verifyRefreshTokenIdStatus.getBody())) {
                 // If refresh token is valid, then generate new access and refresh tokens within the same token family and allow access
-                return generateAccessAndRefreshTokens(userId, tokenFamily);
+                return generateAccessAndRefreshTokens(dbconn, userId, tokenFamily);
 
             } else if (Boolean.TRUE.equals(verifyRefreshTokenFamilyStatus.getBody())) {
                 // If refresh token is invalid and belongs to current token family, then revoke token family and deny access
-                dbconn = DatabaseConnectionPool.getConnection();
                 dbconn.transaction_updateRefreshToken(userId, null, null);
-                dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
-
                 return null;
 
             } else {
@@ -206,14 +198,7 @@ public class AuthTokenService {
     /**
      * Revokes all refresh tokens. All remaining access tokens will expire within 10 minutes
      */
-    public Boolean revokeTokens(String userId) {
-        DatabaseConnection dbconn = null;
-        try {
-            dbconn = DatabaseConnectionPool.getConnection();
-            return dbconn.transaction_updateRefreshToken(userId, null, null).getBody();
-
-        } finally {
-            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
-        }
+    public Boolean revokeTokens(DatabaseConnection dbconn, String userId) {
+        return dbconn.transaction_updateRefreshToken(userId, null, null).getBody();
     }
 }

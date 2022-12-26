@@ -112,13 +112,18 @@ public class AuthTokenServiceTest {
     @Test
     public void testGenerateAccessAndRefreshToken() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
-        ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
-        assertEquals(HttpStatus.OK, createUserStatus.getStatusCode());
+        try {
+            ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
-        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        assertNotNull(tokens);
+            assertEquals(HttpStatus.OK, createUserStatus.getStatusCode());
+
+            AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens(dbconn, "userId");
+            assertNotNull(tokens);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
     }
 
     @Test
@@ -148,75 +153,90 @@ public class AuthTokenServiceTest {
     @Test
     public void testVerifyRefreshToken() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
-        dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
-        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
+        try {
+            dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
-        Boolean accessTokenValid = authTokenService.verifyAccessToken("userId", tokens.accessToken);
-        tokens = authTokenService.verifyRefreshToken("userId", tokens.refreshToken);
+            AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens(dbconn, "userId");
 
-        assertTrue(accessTokenValid);
-        assertNotNull(tokens);
+            Boolean accessTokenValid = authTokenService.verifyAccessToken("userId", tokens.accessToken);
+            tokens = authTokenService.verifyRefreshToken(dbconn, "userId", tokens.refreshToken);
+
+            assertTrue(accessTokenValid);
+            assertNotNull(tokens);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
     }
 
     @Test
     public void testRefreshTokenReuseDetection() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
-        dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
-        // Generate access and refresh tokens
-        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        String refreshToken = tokens.refreshToken;
+        try {
+            dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
-        // Use the first refresh token. verification should succeed
-        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNotNull(tokens);
+            // Generate access and refresh tokens
+            AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens(dbconn, "userId");
+            String refreshToken = tokens.refreshToken;
 
-        String newRefreshToken = tokens.refreshToken;
+            // Use the first refresh token. verification should succeed
+            tokens = authTokenService.verifyRefreshToken(dbconn, "userId", refreshToken);
+            assertNotNull(tokens);
 
-        // Reuse the first refresh token. verification should fail and the token family should be revoked
-        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNull(tokens);
+            String newRefreshToken = tokens.refreshToken;
 
-        // Reuse the second refresh token. verification should fail since the token family has been revoked
-        tokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
-        assertNull(tokens);
+            // Reuse the first refresh token. verification should fail and the token family should be revoked
+            tokens = authTokenService.verifyRefreshToken(dbconn, "userId", refreshToken);
+            assertNull(tokens);
+
+            // Reuse the second refresh token. verification should fail since the token family has been revoked
+            tokens = authTokenService.verifyRefreshToken(dbconn, "userId", newRefreshToken);
+            assertNull(tokens);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
     }
 
     @Test
     public void testRefreshTokenReuseDetectionNewTokenFamily() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
-        dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
-        // Generate access and refresh tokens
-        AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        String refreshToken = tokens.refreshToken;
+        try {
+            dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
 
-        // Use the first refresh token from first family. verification should succeed
-        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNotNull(tokens);
+            // Generate access and refresh tokens
+            AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens(dbconn,"userId");
+            String refreshToken = tokens.refreshToken;
 
-        // Save the second refresh token from first family
-        String newRefreshToken = tokens.refreshToken;
+            // Use the first refresh token from first family. verification should succeed
+            tokens = authTokenService.verifyRefreshToken(dbconn,"userId", refreshToken);
+            assertNotNull(tokens);
 
-        // Reuse the first refresh token from first family. verification should fail and the token family should be revoked
-        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNull(tokens);
+            // Save the second refresh token from first family
+            String newRefreshToken = tokens.refreshToken;
 
-        // Generate access and refresh tokens from a new token family
-        tokens = authTokenService.generateAccessAndRefreshTokens("userId");
-        assertNotNull(tokens);
-        refreshToken = tokens.refreshToken;
+            // Reuse the first refresh token from first family. verification should fail and the token family should be revoked
+            tokens = authTokenService.verifyRefreshToken(dbconn,"userId", refreshToken);
+            assertNull(tokens);
 
-        // Use the new refresh token from second family. verification should succeed
-        tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
-        assertNotNull(tokens);
+            // Generate access and refresh tokens from a new token family
+            tokens = authTokenService.generateAccessAndRefreshTokens(dbconn, "userId");
+            assertNotNull(tokens);
+            refreshToken = tokens.refreshToken;
 
-        // Use the second refresh token from first family. verification should fail since the token family has been revoked
-        tokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
-        assertNull(tokens);
+            // Use the new refresh token from second family. verification should succeed
+            tokens = authTokenService.verifyRefreshToken(dbconn,"userId", refreshToken);
+            assertNotNull(tokens);
+
+            // Use the second refresh token from first family. verification should fail since the token family has been revoked
+            tokens = authTokenService.verifyRefreshToken(dbconn,"userId", newRefreshToken);
+            assertNull(tokens);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
     }
 }
