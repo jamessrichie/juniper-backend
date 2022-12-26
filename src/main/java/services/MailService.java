@@ -56,7 +56,7 @@ public class MailService {
         String senderName = "The Juniper App";
 
         MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message);
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
         helper.setFrom(fromAddress, senderName);
         helper.setTo(toAddress);
@@ -91,6 +91,34 @@ public class MailService {
 
         } catch (Exception e) {
             return Utilities.createStatusJSON("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Sends a password reset code to the recipient
+     *
+     * @param name recipient name
+     * @param toAddress recipient address
+     * @param passwordResetCode recipient user's password reset code
+     *
+     * @return JSON object containing status message. 200 status code iff success
+     */
+    public ResponseEntity<Object> sendPasswordResetEmail(String name, String toAddress, String passwordResetCode) {
+        try {
+            String subject = "Password reset request";
+            String content = Utilities.loadTemplate("password_reset_email.html");
+            String verificationUrl = API_HOST + "/auth/reset?code=" + passwordResetCode;
+
+            content = content.replace("[[name]]", substringBefore(name, " "));
+            content = content.replace("[[url]]", verificationUrl);
+            content = content.replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR)));
+
+            sendEmail(toAddress, subject, content);
+
+            return Utilities.createStatusJSON("Successfully sent reset email", HttpStatus.OK);
+
+        } catch (Exception e) {
+            return Utilities.createStatusJSON("Failed to send reset email", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
