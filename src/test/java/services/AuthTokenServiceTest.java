@@ -62,7 +62,7 @@ public class AuthTokenServiceTest {
                                                       "id", "family", "type", testAlgorithm);
         DecodedJWT decodedToken = tokenVerifier.verify(token);
 
-        // check that token claims are as expected
+        // Check that token claims are as expected
         assertEquals("issuer", decodedToken.getIssuer());
         assertEquals("userId", decodedToken.getSubject());
         assertEquals("audience", decodedToken.getAudience().get(0));
@@ -78,14 +78,14 @@ public class AuthTokenServiceTest {
         String accessToken2 = authTokenService.generateAccessToken("userId1");
         String accessToken3 = authTokenService.generateAccessToken("userId2");
 
-        // test that token creation works
+        // Test that token creation works
         assertNotNull(accessToken1);
         assertNotNull(accessToken2);
         assertNotNull(accessToken3);
 
-        // test that tokens for the same user are unique
+        // Test that tokens for the same user are unique
         assertNotEquals(accessToken1, accessToken2);
-        // test that tokens for different users are unique
+        // Test that tokens for different users are unique
         assertNotEquals(accessToken1, accessToken3);
     }
 
@@ -96,16 +96,16 @@ public class AuthTokenServiceTest {
         String refreshToken3 = authTokenService.generateRefreshToken("userId2", "id3","family1");
         String refreshToken4 = authTokenService.generateRefreshToken("userId2", "id4","family2");
 
-        // test that token creation works
+        // Test that token creation works
         assertNotNull(refreshToken1);
         assertNotNull(refreshToken2);
         assertNotNull(refreshToken3);
 
-        // test that tokens for the same user within the same token family are unique
+        // Test that tokens for the same user within the same token family are unique
         assertNotEquals(refreshToken1, refreshToken2);
-        // test that tokens for different users within the same token family are unique
+        // Test that tokens for different users within the same token family are unique
         assertNotEquals(refreshToken1, refreshToken3);
-        // test that tokens for the same user within different token families are unique
+        // Test that tokens for the same user within different token families are unique
         assertNotEquals(refreshToken3, refreshToken4);
     }
 
@@ -123,17 +123,17 @@ public class AuthTokenServiceTest {
 
     @Test
     public void testTokenExpiration() throws InterruptedException {
-        // generate a token that is valid for 3 seconds
+        // Generate a token that is valid for 3 seconds
         String token = authTokenService.generateToken("issuer", "userId", "audience", Instant.now(), Instant.now().plus(3, ChronoUnit.SECONDS),
                                                       "id", "access", "type", testAlgorithm);
         DecodedJWT decodedToken = tokenVerifier.verify(token);
 
-        // test that token is valid immediately after generation
+        // Test that token is valid immediately after generation
         assertTrue(decodedToken.getExpiresAtAsInstant().isAfter(Instant.now()));
 
         Thread.sleep(3500);
 
-        // test that token is valid >3 seconds after generation
+        // Test that token is valid >3 seconds after generation
         assertFalse(decodedToken.getExpiresAtAsInstant().isAfter(Instant.now()));
     }
 
@@ -166,21 +166,21 @@ public class AuthTokenServiceTest {
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
         dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
-        // generate access and refresh tokens
+        // Generate access and refresh tokens
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
         String refreshToken = tokens.refreshToken;
 
-        // use the first refresh token. verification should succeed
+        // Use the first refresh token. verification should succeed
         tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
         assertNotNull(tokens);
 
         String newRefreshToken = tokens.refreshToken;
 
-        // reuse the first refresh token. verification should fail and the token family should be revoked
+        // Reuse the first refresh token. verification should fail and the token family should be revoked
         tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
         assertNull(tokens);
 
-        // reuse the second refresh token. verification should fail since the token family has been revoked
+        // Reuse the second refresh token. verification should fail since the token family has been revoked
         tokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
         assertNull(tokens);
     }
@@ -191,31 +191,31 @@ public class AuthTokenServiceTest {
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
         dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
-        // generate access and refresh tokens
+        // Generate access and refresh tokens
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
         String refreshToken = tokens.refreshToken;
 
-        // use the first refresh token from first family. verification should succeed
+        // Use the first refresh token from first family. verification should succeed
         tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
         assertNotNull(tokens);
 
-        // save the second refresh token from first family
+        // Save the second refresh token from first family
         String newRefreshToken = tokens.refreshToken;
 
-        // reuse the first refresh token from first family. verification should fail and the token family should be revoked
+        // Reuse the first refresh token from first family. verification should fail and the token family should be revoked
         tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
         assertNull(tokens);
 
-        // generate access and refresh tokens from a new token family
+        // Generate access and refresh tokens from a new token family
         tokens = authTokenService.generateAccessAndRefreshTokens("userId");
         assertNotNull(tokens);
         refreshToken = tokens.refreshToken;
 
-        // use the new refresh token from second family. verification should succeed
+        // Use the new refresh token from second family. verification should succeed
         tokens = authTokenService.verifyRefreshToken("userId", refreshToken);
         assertNotNull(tokens);
 
-        // use the second refresh token from first family. verification should fail since the token family has been revoked
+        // Use the second refresh token from first family. verification should fail since the token family has been revoked
         tokens = authTokenService.verifyRefreshToken("userId", newRefreshToken);
         assertNull(tokens);
     }

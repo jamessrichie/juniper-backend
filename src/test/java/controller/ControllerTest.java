@@ -31,7 +31,7 @@ public class ControllerTest {
 
     @BeforeClass
     public static void setUpBeforeClass() throws IOException {
-        // do not swap these two lines of code or things will inexplicably break
+        // Do not swap these two lines of code or things will inexplicably break
         SpringApplication.run(RestServiceApplication.class);
         DatabaseConnectionPool.enableTesting();
 

@@ -48,19 +48,19 @@ public class AuthController {
         String email = payload.get("email").toLowerCase();
         String password = payload.get("password");
 
-        // check that the credentials are correct
+        // Check that the credentials are correct
         ResponseEntity<Boolean> verifyCredentialsStatus = dbconn.transaction_verifyCredentials(email, password);
         if (Boolean.FALSE.equals(verifyCredentialsStatus.getBody())) {
             return createStatusJSON("Incorrect credentials", HttpStatus.UNAUTHORIZED);
         }
 
-        // check that the email has been verified
+        // Check that the email has been verified
         ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
         if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
             return createStatusJSON("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
         }
 
-        // get the userId for token generation
+        // Get the userId for token generation
         ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
         if (resolveEmailToUserIdStatus.getStatusCode() != HttpStatus.OK) {
             return createStatusJSON("Failed to verify credentials", HttpStatus.BAD_REQUEST);

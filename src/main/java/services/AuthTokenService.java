@@ -179,11 +179,11 @@ public class AuthTokenService {
             dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
             if (Boolean.TRUE.equals(verifyRefreshTokenIdStatus.getBody())) {
-                // if refresh token is valid, then generate new access and refresh tokens within the same token family and allow access
+                // If refresh token is valid, then generate new access and refresh tokens within the same token family and allow access
                 return generateAccessAndRefreshTokens(userId, tokenFamily);
 
             } else if (Boolean.TRUE.equals(verifyRefreshTokenFamilyStatus.getBody())) {
-                // if refresh token is invalid and belongs to current token family, then revoke token family and deny access
+                // If refresh token is invalid and belongs to current token family, then revoke token family and deny access
                 dbconn = DatabaseConnectionPool.getConnection();
                 dbconn.transaction_updateRefreshToken(userId, null, null);
                 dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
@@ -191,7 +191,7 @@ public class AuthTokenService {
                 return null;
 
             } else {
-                // if refresh token is invalid but does not belong to current token family, then deny access
+                // If refresh token is invalid but does not belong to current token family, then deny access
                 return null;
             }
         } catch (AssertionError e) {

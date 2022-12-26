@@ -97,7 +97,7 @@ public class DatabaseConnection {
         String adminName = configProps.getProperty("RDS_USERNAME");
         String password = configProps.getProperty("RDS_PASSWORD");
 
-        String connectionUrl = String.format("jdbc:mysql://%s:%s/%s?user=%s&password=%s",
+        String connectionUrl = String.format("jdbc:mysql://%S:%s/%s?user=%s&password=%s",
                                              endpoint, port, dbName, adminName, password);
         Connection conn = DriverManager.getConnection(connectionUrl);
 
@@ -213,7 +213,7 @@ public class DatabaseConnection {
             try {
                 beginTransaction();
 
-                // checks that email is not mapped to a user record
+                // Checks that email is not mapped to a user record
                 ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
                 if (resolveEmailToUserRecordRS.next()) {
                     resolveEmailToUserRecordRS.close();
@@ -221,7 +221,7 @@ public class DatabaseConnection {
                 }
                 resolveEmailToUserRecordRS.close();
 
-                // checks that user handle is not mapped to a user id
+                // Checks that user handle is not mapped to a user id
                 if (transaction_userHandleToUserId(userHandle).getBody() != null) {
                     return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
                 }
@@ -229,7 +229,7 @@ public class DatabaseConnection {
                 byte[] salt = get_salt();
                 byte[] hash = get_hash(password, salt);
 
-                // creates the user
+                // Creates the user
                 executeUpdate(createUserStatement, userId, userHandle, name, email, salt, hash, verificationCode);
 
                 commitTransaction();
@@ -254,7 +254,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<String> transaction_userHandleToUserId(String userHandle) {
         try{
-            // checks that user handle is not mapped to a user id
+            // Checks that user handle is not mapped to a user id
             ResultSet resolveUserHandleToUserRecordRS = executeQuery(resolveUserHandleToUserRecordStatement,
                                                                      userHandle);
             if (!resolveUserHandleToUserRecordRS.next()) {
@@ -279,7 +279,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<String> transaction_resolveEmailToUserName(String email) {
         try {
-            // retrieves the user record that the email is mapped to
+            // Retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
@@ -303,7 +303,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<String> transaction_resolveEmailToUserId(String email) {
         try {
-            // retrieves the user name that the email is mapped to
+            // Retrieves the user name that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
@@ -327,7 +327,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<String> transaction_resolveEmailToVerificationCode(String email) {
         try {
-            // retrieves the user record that the email is mapped to
+            // Retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
@@ -352,7 +352,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<Boolean> transaction_verifyEmail(String email) {
         try {
-            // retrieves the verification code that the email is mapped to
+            // Retrieves the verification code that the email is mapped to
             ResultSet checkEmailVerificationRS = executeQuery(checkEmailVerificationStatement, email);
             if (!checkEmailVerificationRS.next()) {
                 checkEmailVerificationRS.close();
@@ -379,8 +379,8 @@ public class DatabaseConnection {
             try {
                 beginTransaction();
 
-                // checks whether the verification code has been used
-                // this check is done to distinguish between expired vs used verification codes
+                // Checks whether the verification code has been used
+                // This check is done to distinguish between expired and used verification codes
                 ResultSet checkVerificationCodeUsedRS = executeQuery(checkVerificationCodeUsedStatement,
                                                                      verificationCode);
                 checkVerificationCodeUsedRS.next();
@@ -390,7 +390,7 @@ public class DatabaseConnection {
                 }
                 checkVerificationCodeUsedRS.close();
 
-                // checks whether the verification code exists and is still active
+                // Checks whether the verification code exists and is still active
                 ResultSet checkVerificationCodeActiveRS = executeQuery(checkVerificationCodeActiveStatement,
                                                                        verificationCode);
                 checkVerificationCodeActiveRS.next();
@@ -400,7 +400,7 @@ public class DatabaseConnection {
                 }
                 checkVerificationCodeActiveRS.close();
 
-                // verifies the user
+                // Verifies the user
                 executeUpdate(updateEmailVerificationStatement, 1, verificationCode);
 
                 commitTransaction();
@@ -425,10 +425,10 @@ public class DatabaseConnection {
      */
     public ResponseEntity<Boolean> transaction_verifyCredentials(String email, String password) {
         try {
-            // retrieves the user record that the email is mapped to
+            // Retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
-                // if user does not exist, vaguely claim that credentials are incorrect
+                // If user does not exist, vaguely claim that credentials are incorrect
                 resolveEmailToUserRecordRS.close();
                 return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
@@ -459,10 +459,10 @@ public class DatabaseConnection {
             try {
                 beginTransaction();
 
-                // retrieves the user record that the email is mapped to
+                // Retrieves the user record that the email is mapped to
                 ResultSet resolveEmailToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
                 if (!resolveEmailToUserRecordRS.next()) {
-                    // if user does not exist, vaguely claim that credentials are incorrect
+                    // If user does not exist, vaguely claim that credentials are incorrect
                     resolveEmailToUserRecordRS.close();
                     return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
                 }
@@ -471,7 +471,7 @@ public class DatabaseConnection {
                 byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
                 resolveEmailToUserRecordRS.close();
 
-                // check that credentials are correct
+                // Check that credentials are correct
                 if (!Arrays.equals(hash, get_hash(password, salt))) {
                     return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
                 }
@@ -479,7 +479,7 @@ public class DatabaseConnection {
                 byte[] newSalt = get_salt();
                 byte[] newHash = get_hash(newPassword, newSalt);
 
-                // creates the user
+                // Creates the user
                 executeUpdate(updateCredentialsStatement, newSalt, newHash, userId);
 
                 commitTransaction();
@@ -504,7 +504,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenId(String userId, String tokenId) {
         try {
-            // retrieves the refresh token id that the user id is mapped to
+            // Retrieves the refresh token id that the user id is mapped to
             ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
             if(!resolveUserIdToUserRecordRS.next()) {
                 resolveUserIdToUserRecordRS.close();
@@ -533,7 +533,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenFamily(String userId, String tokenFamily) {
         try {
-            // retrieves the refresh token family that the user id is mapped to
+            // Retrieves the refresh token family that the user id is mapped to
             ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
             if(!resolveUserIdToUserRecordRS.next()) {
                 resolveUserIdToUserRecordRS.close();
@@ -763,10 +763,10 @@ public class DatabaseConnection {
      * @return relationship_status / 200 status if successfully liked other user
      */
     public ResponseEntity<String> transaction_likeUser(String userId, String friendUserId) {
-        // if friend likes user
+        // If friend likes user
         //      user and friend are friends
         //      friend and user are friends
-        // else
+        // Else
         //      user and friend are liked
         throw new NotYetImplementedException();
     }
