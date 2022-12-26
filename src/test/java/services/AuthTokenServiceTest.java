@@ -33,6 +33,7 @@ public class AuthTokenServiceTest {
     @BeforeClass
     public static void setUpBeforeClass() throws IOException {
         DatabaseConnectionPool.enableTesting();
+        DatabaseConnectionPool.reducePoolSize();
         authTokenService = new AuthTokenService();
     }
 
@@ -45,14 +46,14 @@ public class AuthTokenServiceTest {
     public void setUpBeforeTest() throws SQLException {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         savepoint = dbconn.createSavepoint();
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
     }
 
     @After
     public void tearDownAfterTest() throws SQLException {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.revertToSavepoint(savepoint);
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
     }
 
     @Test
@@ -112,7 +113,7 @@ public class AuthTokenServiceTest {
     public void testGenerateAccessAndRefreshToken() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         assertEquals(HttpStatus.OK, createUserStatus.getStatusCode());
 
@@ -148,7 +149,7 @@ public class AuthTokenServiceTest {
     public void testVerifyRefreshToken() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
 
@@ -163,7 +164,7 @@ public class AuthTokenServiceTest {
     public void testRefreshTokenReuseDetection() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         // generate access and refresh tokens
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");
@@ -188,7 +189,7 @@ public class AuthTokenServiceTest {
     public void testRefreshTokenReuseDetectionNewTokenFamily() {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.transaction_createUser("userId", "userHandle", "userName", "email", "password", "verificationCode");
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         // generate access and refresh tokens
         AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens("userId");

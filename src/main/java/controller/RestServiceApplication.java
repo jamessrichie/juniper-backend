@@ -8,9 +8,7 @@ import java.sql.SQLException;
 
 @SpringBootApplication
 public class RestServiceApplication {
-
     public static void main(String[] args) throws SQLException, IOException {
         SpringApplication.run(RestServiceApplication.class, args);
     }
-
 }

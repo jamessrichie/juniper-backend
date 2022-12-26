@@ -127,7 +127,7 @@ public class AuthTokenService {
         }
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         ResponseEntity<Boolean> updateRefreshTokenStatus = dbconn.transaction_updateRefreshToken(userId, refreshTokenId, refreshTokenFamily);
-        DatabaseConnectionPool.releaseConnection(dbconn);
+        dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         if (updateRefreshTokenStatus.getStatusCode() != HttpStatus.OK) {
             return null;
@@ -176,7 +176,7 @@ public class AuthTokenService {
             DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
             ResponseEntity<Boolean> verifyRefreshTokenIdStatus = dbconn.transaction_verifyRefreshTokenId(userId, tokenId);
             ResponseEntity<Boolean> verifyRefreshTokenFamilyStatus = dbconn.transaction_verifyRefreshTokenFamily(userId, tokenFamily);
-            DatabaseConnectionPool.releaseConnection(dbconn);
+            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
             if (Boolean.TRUE.equals(verifyRefreshTokenIdStatus.getBody())) {
                 // if refresh token is valid, then generate new access and refresh tokens within the same token family and allow access
@@ -186,7 +186,7 @@ public class AuthTokenService {
                 // if refresh token is invalid and belongs to current token family, then revoke token family and deny access
                 dbconn = DatabaseConnectionPool.getConnection();
                 dbconn.transaction_updateRefreshToken(userId, null, null);
-                DatabaseConnectionPool.releaseConnection(dbconn);
+                dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
                 return null;
 
@@ -213,7 +213,7 @@ public class AuthTokenService {
             return dbconn.transaction_updateRefreshToken(userId, null, null).getBody();
 
         } finally {
-            DatabaseConnectionPool.releaseConnection(dbconn);
+            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
         }
     }
 }
