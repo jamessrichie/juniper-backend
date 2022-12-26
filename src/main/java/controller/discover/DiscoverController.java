@@ -1,4 +1,4 @@
-package controller.feed;
+package controller.discover;
 
 import java.io.*;
 import java.util.*;
@@ -12,7 +12,7 @@ import static helpers.Utilities.*;
 
 @RestController
 @RequestMapping("/discover")
-public class FeedController {
+public class DiscoverController {
 
     // Token authentication service
     private final AuthTokenService authTokenService;
@@ -20,7 +20,7 @@ public class FeedController {
     /**
      * Initializes controller
      */
-    public FeedController() throws IOException {
+    public DiscoverController() throws IOException {
         authTokenService = new AuthTokenService();
     }
 

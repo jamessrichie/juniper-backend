@@ -3,6 +3,7 @@ package controller.authentication;
 import java.io.*;
 import java.util.*;
 
+import exceptions.NotYetImplementedException;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,7 +13,7 @@ import types.AuthTokens;
 import static helpers.Utilities.*;
 
 @RestController
-@RequestMapping("/v1.0/auth")
+@RequestMapping("/auth")
 public class AuthController {
 
     // Token authentication service
@@ -35,7 +36,7 @@ public class AuthController {
      *         otherwise, JSON object containing status message.
      *         200 status code iff success
      */
-    @RequestMapping(path = "/verify-credentials",
+    @RequestMapping(path = "/login",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
@@ -169,5 +170,17 @@ public class AuthController {
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
         }
+    }
+
+    // POST
+    public ResponseEntity<Object> sendPasswordResetEmail() {
+        // generate new random string
+        // assign random string to database with expiration date
+        throw new NotYetImplementedException();
+    }
+
+    // GET
+    public ResponseEntity<String> processResetCode() {
+        //
     }
 }

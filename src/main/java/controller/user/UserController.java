@@ -11,7 +11,7 @@ import services.*;
 import static helpers.Utilities.*;
 
 @RestController
-@RequestMapping("/v1.0/user")
+@RequestMapping("/user")
 public class UserController {
 
     // Token authentication service
@@ -52,12 +52,13 @@ public class UserController {
             // Check that the email is not in use
             ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
             if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
+                // TODO: If email is in use, then send reset password url
                 return createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
             }
 
             String userId = UUID.randomUUID().toString();
             String userHandle = generateUserHandle(dbconn, name);
-            String verificationCode = generateBase62String(64);
+            String verificationCode = generateSecureString(64);
 
             // Creates the user
             ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
@@ -130,22 +131,22 @@ public class UserController {
 
             return switch (processVerificationCodeStatus.getStatusCode()) {
                 case OK -> new ResponseEntity<>(
-                        loadTemplate("verification/verification_success_page.html").replace("[[year]]",
+                        loadTemplate("verification_success_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.OK);
 
                 case BAD_REQUEST -> new ResponseEntity<>(
-                        loadTemplate("verification/already_verified_page.html").replace("[[year]]",
+                        loadTemplate("already_verified_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.BAD_REQUEST);
 
                 case GONE -> new ResponseEntity<>(
-                        loadTemplate("verification/verification_expired_page.html").replace("[[year]]",
+                        loadTemplate("verification_expired_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.GONE);
 
                 default -> new ResponseEntity<>(
-                        loadTemplate("verification/verification_failed_page.html").replace("[[year]]",
+                        loadTemplate("verification_failed_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         processVerificationCodeStatus.getStatusCode());
             };
@@ -400,6 +401,75 @@ public class UserController {
     }
 
     /**
+     * User rates other user
+     *
+     * @param payload JSON object containing "userId", "accessToken", "otherUserId", "rating" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/rate",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> rateUser(@RequestBody Map<String, String> payload) {
+
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String otherUserId = payload.get("otherUserId");
+            int rating = Integer.parseInt(payload.get("rating"));
+
+            return createStatusJSON(dbconn.transaction_rateUser(userId, otherUserId, rating));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
+    }
+
+    /**
+     * User blocks other user
+     *
+     * @param payload JSON object containing "userId", "accessToken", "otherUserId" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/block",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> blockUser(@RequestBody Map<String, String> payload) {
+
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String otherUserId = payload.get("otherUserId");
+
+            return createStatusJSON(dbconn.transaction_blockUser(userId, otherUserId));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
+    }
+
+    /**
      * Generates a unique user handle from a name
      */
     private String generateUserHandle(DatabaseConnection dbconn, String name) {
@@ -410,21 +480,5 @@ public class UserController {
             userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
         }
         return userHandle;
-    }
-
-    /**
-     * Generates a random base62 string of specified length
-     */
-    private String generateBase62String(int length) {
-        int leftLimit = 48;
-        int rightLimit = 122;
-
-        Random random = new Random();
-
-        return random.ints(leftLimit, rightLimit + 1)
-          .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
-          .limit(length)
-          .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
-          .toString();
     }
 }

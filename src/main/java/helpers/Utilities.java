@@ -1,11 +1,12 @@
 package helpers;
 
+import java.util.*;
+import java.security.SecureRandom;
+
 import org.jsoup.Jsoup;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ResourceUtils;
-
-import java.util.*;
 
 public final class Utilities {
 
@@ -48,5 +49,17 @@ public final class Utilities {
      */
     public static <T> ResponseEntity<Object> createStatusJSON(ResponseEntity<T> responseEntity) {
         return createStatusJSON(responseEntity.getBody().toString(), responseEntity.getStatusCode());
+    }
+
+    /**
+     * Generates a cryptographically secure random string of specified length
+     */
+    public static String generateSecureString(int length) {
+        SecureRandom random = new SecureRandom();
+
+        byte[] bytes = new byte[length];
+        random.nextBytes(bytes);
+
+        return new String(bytes);
     }
 }

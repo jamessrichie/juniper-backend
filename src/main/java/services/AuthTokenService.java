@@ -82,12 +82,12 @@ public class AuthTokenService {
     }
 
     /**
-     * Generates an access token valid for 10 minutes
+     * Generates an access token valid for 60 minutes
      *
      * @return a signed JSON Web Token
      */
     public String generateAccessToken(String userId) {
-        return generateToken("auth0", userId, API_HOST, Instant.now(), Instant.now().plus(10, ChronoUnit.MINUTES),
+        return generateToken("auth0", userId, API_HOST, Instant.now(), Instant.now().plus(60, ChronoUnit.MINUTES),
                              UUID.randomUUID().toString(), null, "access", HMAC256Algorithm);
     }
 
@@ -196,7 +196,7 @@ public class AuthTokenService {
     }
 
     /**
-     * Revokes all refresh tokens. All remaining access tokens will expire within 10 minutes
+     * Revokes all refresh tokens. All remaining access tokens will expire within 60 minutes
      */
     public Boolean revokeTokens(DatabaseConnection dbconn, String userId) {
         return dbconn.transaction_updateRefreshToken(userId, null, null).getBody();

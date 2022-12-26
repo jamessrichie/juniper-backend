@@ -78,7 +78,7 @@ public class MailService {
     public ResponseEntity<Object> sendVerificationEmail(String name, String toAddress, String verificationCode) {
         try {
             String subject = "Please verify your email";
-            String content = Utilities.loadTemplate("verification/verification_email.html");
+            String content = Utilities.loadTemplate("verification_email.html");
             String verificationUrl = API_HOST + "/user/verify?code=" + verificationCode;
 
             content = content.replace("[[name]]", substringBefore(name, " "));

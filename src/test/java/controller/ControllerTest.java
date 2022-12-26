@@ -26,7 +26,6 @@ public class ControllerTest {
 
     private Savepoint savepoint;
     private static String apiHost;
-    private static String apiBaseUrl;
     private static CloseableHttpClient httpClient;
 
     @BeforeClass
@@ -39,7 +38,6 @@ public class ControllerTest {
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
 
         apiHost = configProps.getProperty("API_HOST");
-        apiBaseUrl = configProps.getProperty("API_BASE_URL");
 
         httpClient = HttpClients.createDefault();
     }
@@ -65,7 +63,7 @@ public class ControllerTest {
     }
 
     public static ResponseEntity<String> sendGetRequest(String apiPathUrl, Map<String, String> parameters) throws IOException {
-        StringJoiner sj = new StringJoiner("&", apiHost + apiBaseUrl + apiPathUrl + "?", "");
+        StringJoiner sj = new StringJoiner("&", apiHost + apiPathUrl + "?", "");
         for (String key : parameters.keySet()) {
             sj.add(key + "=" + parameters.get(key));
         }
@@ -82,7 +80,7 @@ public class ControllerTest {
     }
 
     public static ResponseEntity<JsonObject> sendPostRequest(String apiPathUrl, Map<String, Object> body) throws IOException {
-        HttpPost post = new HttpPost(apiHost + apiBaseUrl + apiPathUrl);
+        HttpPost post = new HttpPost(apiHost + apiPathUrl);
         StringEntity entity = new StringEntity(new Gson().toJson(body));
         post.setEntity(entity);
         post.setHeader("Accept", "application/json");
