@@ -121,6 +121,7 @@ public class DatabaseConnection {
      * Closes the application-to-database connection
      */
     public void closeConnection() throws SQLException {
+        closeStatements();
         conn.close();
     }
 
@@ -161,6 +162,42 @@ public class DatabaseConnection {
         checkEmailVerificationStatement = conn.prepareStatement(CHECK_EMAIL_VERIFICATION);
         checkVerificationCodeActiveStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_ACTIVE);
         checkVerificationCodeUsedStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_USED);
+    }
+
+    private void closeStatements() throws SQLException {
+        // Create statements
+        createCourseStatement.close();
+        createMediaStatement.close();
+        createRegistrationStatement.close();
+        createRelationshipStatement.close();
+        createUserStatement.close();
+
+        // Delete statements
+        deleteMediaStatement.close();
+        deleteRegistrationStatement.close();
+
+        // Update statements
+        updateBiographyStatement.close();
+        updateCardColorStatement.close();
+        updateCredentialsStatement.close();
+        updateEducationInformationStatement.close();
+        updateEmailVerificationStatement.close();
+        updatePersonalInformationStatement.close();
+        updateProfilePictureStatement.close();
+        updateRefreshTokenStatement.close();
+        updateRelationshipStatement.close();
+
+        // Select statements
+        resolveCourseIdUniversityIdToCourseRecordStatement.close();
+        resolveEmailToUserRecordStatement.close();
+        resolveUserHandleToUserRecordStatement.close();
+        resolveUserIdFriendUserIdToRecordStatement.close();
+        resolveUserIdToUserRecordStatement.close();
+
+        // Boolean statements
+        checkEmailVerificationStatement.close();
+        checkVerificationCodeActiveStatement.close();
+        checkVerificationCodeUsedStatement.close();
     }
 
     /**
