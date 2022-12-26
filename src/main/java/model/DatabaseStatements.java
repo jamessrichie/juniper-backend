@@ -31,6 +31,11 @@ public final class DatabaseStatements {
     public static final String DELETE_REGISTRATION = "DELETE FROM tbl_registration " +
                                                       "WHERE user_id = ?";
 
+    // Removes a user's relationship record
+    public static final String DELETE_RELATIONSHIP = "DELETE FROM tbl_relationship " +
+                                                     "WHERE user_id = ? " +
+                                                     "AND other_user_id = ?";
+
     // Sets a user's biography field
     public static final String UPDATE_BIOGRAPHY = "UPDATE tbl_users " +
                                                    "SET biography = ? " +
@@ -75,8 +80,9 @@ public final class DatabaseStatements {
 
     // Sets a user's relationship_status and rating fields
     public static final String UPDATE_RELATIONSHIP = "UPDATE tbl_relationships " +
-                                                      "SET relationship_status = ?, rating = ? " +
-                                                      "WHERE user_id = ? AND friend_user_id = ?";
+                                                     "SET relationship_status = ?, rating = ? " +
+                                                     "WHERE user_id = ? " +
+                                                     "AND other_user_id = ?";
 
     // Gets the course record for a course_id, university_id pair
     public static final String RESOLVE_COURSE_ID_UNIVERSITY_ID_TO_COURSE_RECORD = "SELECT * FROM tbl_courses " +
@@ -91,10 +97,10 @@ public final class DatabaseStatements {
     public static final String RESOLVE_USER_HANDLE_TO_USER_RECORD = "SELECT * FROM tbl_users " +
                                                                      "WHERE user_handle = ?";
 
-    // Gets the relationship record for a user_id, friend_user_id pair
-    public static final String RESOLVE_USER_ID_FRIEND_USER_ID_TO_RECORD = "SELECT * FROM tbl_relationships " +
+    // Gets the relationship record for a user_id, other_user_id pair
+    public static final String RESOLVE_USER_ID_OTHER_USER_ID_TO_RECORD = "SELECT * FROM tbl_relationships " +
                                                                            "WHERE user_id = ? " +
-                                                                           "AND friend_user_id ?";
+                                                                           "AND other_user_id ?";
 
     // Gets the user record for a user_id
     public static final String RESOLVE_USER_ID_TO_USER_RECORD = "SELECT * FROM tbl_users " +

@@ -79,15 +79,14 @@ CREATE TABLE tbl_media
 CREATE TABLE tbl_relationships
 (
     user_id             varchar(36) NOT NULL,
-    friend_user_id      varchar(36) NOT NULL,
+    other_user_id      varchar(36) NOT NULL,
     relationship_status varchar(32) NOT NULL,
     rating              int,
 
-    PRIMARY KEY (user_id, friend_user_id),
+    PRIMARY KEY (user_id, other_user_id),
     FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
-    FOREIGN KEY (friend_user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE
+    FOREIGN KEY (other_user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE
 
 ) ENGINE = INNODB;
 
 CREATE INDEX idx_users_verification_timestamp ON tbl_users (verification_timestamp);
-CREATE INDEX idx_relationships_friends ON tbl_relationships (friend_user_id);

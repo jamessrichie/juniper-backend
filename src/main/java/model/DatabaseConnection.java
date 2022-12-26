@@ -42,6 +42,7 @@ public class DatabaseConnection {
     // Delete statements
     public PreparedStatement deleteMediaStatement;
     public PreparedStatement deleteRegistrationStatement;
+    public PreparedStatement deleteRelationshipStatement;
 
     // Update statements
     public PreparedStatement updateBiographyStatement;
@@ -58,7 +59,7 @@ public class DatabaseConnection {
     public PreparedStatement resolveCourseIdUniversityIdToCourseRecordStatement;
     public PreparedStatement resolveEmailToUserRecordStatement;
     public PreparedStatement resolveUserHandleToUserRecordStatement;
-    public PreparedStatement resolveUserIdFriendUserIdToRecordStatement;
+    public PreparedStatement resolveUserIdOtherUserIdToRecordStatement;
     public PreparedStatement resolveUserIdToUserRecordStatement;
 
     // Boolean statements
@@ -139,6 +140,7 @@ public class DatabaseConnection {
         // Delete statements
         deleteMediaStatement = conn.prepareStatement(DELETE_MEDIA);
         deleteRegistrationStatement = conn.prepareStatement(DELETE_REGISTRATION);
+        deleteRelationshipStatement = conn.prepareStatement(DELETE_RELATIONSHIP);
 
         // Update statements
         updateBiographyStatement = conn.prepareStatement(UPDATE_BIOGRAPHY);
@@ -155,7 +157,7 @@ public class DatabaseConnection {
         resolveCourseIdUniversityIdToCourseRecordStatement = conn.prepareStatement(RESOLVE_COURSE_ID_UNIVERSITY_ID_TO_COURSE_RECORD);
         resolveEmailToUserRecordStatement = conn.prepareStatement(RESOLVE_EMAIL_TO_USER_RECORD);
         resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
-        resolveUserIdFriendUserIdToRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_FRIEND_USER_ID_TO_RECORD);
+        resolveUserIdOtherUserIdToRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_OTHER_USER_ID_TO_RECORD);
         resolveUserIdToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_USER_RECORD);
 
         // Boolean statements
@@ -175,6 +177,7 @@ public class DatabaseConnection {
         // Delete statements
         deleteMediaStatement.close();
         deleteRegistrationStatement.close();
+        deleteRelationshipStatement.close();
 
         // Update statements
         updateBiographyStatement.close();
@@ -191,7 +194,7 @@ public class DatabaseConnection {
         resolveCourseIdUniversityIdToCourseRecordStatement.close();
         resolveEmailToUserRecordStatement.close();
         resolveUserHandleToUserRecordStatement.close();
-        resolveUserIdFriendUserIdToRecordStatement.close();
+        resolveUserIdOtherUserIdToRecordStatement.close();
         resolveUserIdToUserRecordStatement.close();
 
         // Boolean statements
@@ -725,22 +728,28 @@ public class DatabaseConnection {
     }
 
     /**
-     * User rates friend
+     * User likes other user
      *
      * @effect tbl_relationships (RW), acquires lock
-     * @return true / 200 status iff successfully rated friend
+     * @return relationship_status / 200 status if successfully liked other user
      */
-    public ResponseEntity<Boolean> transaction_rateUser(String userId, String friendUserId, int rating) {
+    public ResponseEntity<Boolean> transaction_likeUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                ResultSet resolveUserIdFriendUserIdToRecordRS = executeQuery(resolveUserIdFriendUserIdToRecordStatement, userId, friendUserId);
-                if (!resolveUserIdFriendUserIdToRecordRS.next() || !resolveUserIdFriendUserIdToRecordRS.getString("relationship_status").equals("friends")) {
-                    return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
-                }
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, otherUserId, userId);
 
-                executeUpdate(updateRelationshipStatement, "friends", rating, userId, friendUserId);
+                if (!resolveUserIdOtherUserIdToRecordRS.next()) {
+                    // If other user has no relationship with user, then user likes other user
+                    executeUpdate(updateRelationshipStatement, "liked", null, userId, otherUserId);
+
+                } else if (resolveUserIdOtherUserIdToRecordRS.getString("relationship_status").equals("liked")) {
+                    // If other user also likes user, then user and other user are now friends
+                    executeUpdate(updateRelationshipStatement, "friends", null, userId, otherUserId);
+                    executeUpdate(updateRelationshipStatement, "friends", null, otherUserId, userId);
+                }
+                resolveUserIdOtherUserIdToRecordRS.close();
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
@@ -757,22 +766,107 @@ public class DatabaseConnection {
     }
 
     /**
-     * User likes other user
+     * User dislikes other user
      *
-     * @effect tbl_relationships (W), acquires lock
+     * @effect tbl_relationships (RW), acquires lock
      * @return relationship_status / 200 status if successfully liked other user
      */
-    public ResponseEntity<String> transaction_likeUser(String userId, String friendUserId) {
-        // If friend likes user
-        //      user and friend are friends
-        //      friend and user are friends
-        // Else
-        //      user and friend are liked
-        throw new NotYetImplementedException();
+    public ResponseEntity<Boolean> transaction_dislikeUser(String userId, String otherUserId) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, otherUserId, userId);
+
+                // If other user likes user, then delete that record
+                if (resolveUserIdOtherUserIdToRecordRS.next()) {
+                    executeUpdate(deleteRegistrationStatement, otherUserId, otherUserId);
+                }
+                resolveUserIdOtherUserIdToRecordRS.close();
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
-    public ResponseEntity<Boolean> transaction_dislikeUser() {
-        throw new NotYetImplementedException();
+    /**
+     * User rates other user
+     *
+     * @effect tbl_relationships (RW), acquires lock
+     * @return true / 200 status iff successfully rated other user
+     */
+    public ResponseEntity<Boolean> transaction_rateUser(String userId, String otherUserId, int rating) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, userId, otherUserId);
+                if (!resolveUserIdOtherUserIdToRecordRS.next() || !resolveUserIdOtherUserIdToRecordRS.getString("relationship_status").equals("friends")) {
+                    return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
+                }
+                resolveUserIdOtherUserIdToRecordRS.close();
+
+                executeUpdate(updateRelationshipStatement, "friends", rating, userId, otherUserId);
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * User blocks other user
+     *
+     * @effect tbl_relationships (W), acquires lock
+     * @return true / 200 status iff successfully rated other user
+     */
+    public ResponseEntity<Boolean> transaction_blockUser(String userId, String otherUserId) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                Integer rating;
+
+                // If user rating exists, then preserve it
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, userId, otherUserId);
+                if (resolveUserIdOtherUserIdToRecordRS.next()) {
+                    rating = resolveUserIdOtherUserIdToRecordRS.getInt("rating");
+                } else {
+                    rating = null;
+                }
+                resolveUserIdOtherUserIdToRecordRS.close();
+
+                executeUpdate(updateRelationshipStatement, "blocked", rating, userId, otherUserId);
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
     public List<String> transaction_loadUsers() {
