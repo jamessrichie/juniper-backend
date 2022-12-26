@@ -177,6 +177,14 @@ public class AuthController {
         }
     }
 
+    /**
+     * Sends a password reset email
+     *
+     * @param payload JSON object containing "email" field
+     * @apiNote POST request
+     *
+     * @return JSON object containing status message. 200 status code iff success or user does not exist
+     */
     @RequestMapping(path = "/send-password-reset-email",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
@@ -186,20 +194,19 @@ public class AuthController {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
-            System.out.println(payload);
             String email = payload.get("email").toLowerCase();
 
             // Gets the name of the user
             ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
             if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
-                return createStatusJSON(resolveEmailToUserNameStatus);
+                return createStatusJSON("Successfully sent email", HttpStatus.OK);
             }
             String name = resolveEmailToUserNameStatus.getBody();
 
             // Gets the password reset code for the user
             ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_resolveEmailToPasswordResetCode(email);
             if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
-                return createStatusJSON("Failed to send email", resolveEmailToPasswordResetCodeStatus.getStatusCode());
+                return createStatusJSON("Failed to send email", HttpStatus.INTERNAL_SERVER_ERROR);
             }
             String passwordResetCode = resolveEmailToPasswordResetCodeStatus.getBody();
 

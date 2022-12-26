@@ -52,8 +52,15 @@ public class UserController {
             // Check that the email is not in use
             ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
             if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
-                // TODO: If email is in use, then send reset password url
-                return createStatusJSON("Email is already in use", HttpStatus.BAD_REQUEST);
+                // Gets the password reset code for the user
+                ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_resolveEmailToPasswordResetCode(email);
+                if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
+                    return createStatusJSON("Successfully sent email", HttpStatus.OK);
+                }
+                String passwordResetCode = resolveEmailToPasswordResetCodeStatus.getBody();
+
+                // On success, send verification email
+                return mailService.sendPasswordResetEmail(name, email, passwordResetCode);
             }
 
             String userId = UUID.randomUUID().toString();

@@ -369,8 +369,6 @@ public class DatabaseConnection {
                 ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
                 if (!resolveEmailToUserRecordRS.next()) {
                     return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-                } else if (resolveEmailToUserRecordRS.getBoolean("has_verified_email")) {
-                    return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
                 }
 
                 String passwordResetCode = resolveEmailToUserRecordRS.getString("password_reset_code");

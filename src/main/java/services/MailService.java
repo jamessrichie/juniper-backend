@@ -12,7 +12,7 @@ import org.springframework.mail.javamail.*;
 import org.springframework.util.ResourceUtils;
 import static org.apache.commons.lang3.StringUtils.*;
 
-import helpers.Utilities;
+import static helpers.Utilities.*;
 
 public class MailService {
 
@@ -51,9 +51,13 @@ public class MailService {
      * @param subject email subject
      * @param content email body
      */
-    private void sendEmail(String toAddress, String subject, String content) throws MessagingException, UnsupportedEncodingException {
+    private void sendEmail(String toAddress, String subject, String content, String name, String url) throws MessagingException, UnsupportedEncodingException {
         String fromAddress = "support@thejuniperapp.com";
         String senderName = "The Juniper App";
+
+        content = content.replace("[[name]]", substringBefore(name, " "));
+        content = content.replace("[[url]]", url);
+        content = content.replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR)));
 
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -78,19 +82,15 @@ public class MailService {
     public ResponseEntity<Object> sendVerificationEmail(String name, String toAddress, String verificationCode) {
         try {
             String subject = "Please verify your email";
-            String content = Utilities.loadTemplate("verification_email.html");
+            String content = loadTemplate("verification_email.html");
             String verificationUrl = API_HOST + "/user/verify?code=" + verificationCode;
 
-            content = content.replace("[[name]]", substringBefore(name, " "));
-            content = content.replace("[[url]]", verificationUrl);
-            content = content.replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR)));
+            sendEmail(toAddress, subject, content, name, verificationUrl);
 
-            sendEmail(toAddress, subject, content);
-
-            return Utilities.createStatusJSON("Successfully sent verification email", HttpStatus.OK);
+            return createStatusJSON("Successfully sent email", HttpStatus.OK);
 
         } catch (Exception e) {
-            return Utilities.createStatusJSON("Failed to send verification email", HttpStatus.INTERNAL_SERVER_ERROR);
+            return createStatusJSON("Failed to send email", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -106,19 +106,15 @@ public class MailService {
     public ResponseEntity<Object> sendPasswordResetEmail(String name, String toAddress, String passwordResetCode) {
         try {
             String subject = "Password reset request";
-            String content = Utilities.loadTemplate("password_reset_email.html");
-            String verificationUrl = API_HOST + "/auth/reset?code=" + passwordResetCode;
+            String content = loadTemplate("password_reset_email.html");
+            String passwordResetUrl = API_HOST + "/auth/reset?code=" + passwordResetCode;
 
-            content = content.replace("[[name]]", substringBefore(name, " "));
-            content = content.replace("[[url]]", verificationUrl);
-            content = content.replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR)));
+            sendEmail(toAddress, subject, content, name, passwordResetUrl);
 
-            sendEmail(toAddress, subject, content);
-
-            return Utilities.createStatusJSON("Successfully sent reset email", HttpStatus.OK);
+            return createStatusJSON("Successfully sent email", HttpStatus.OK);
 
         } catch (Exception e) {
-            return Utilities.createStatusJSON("Failed to send reset email", HttpStatus.INTERNAL_SERVER_ERROR);
+            return createStatusJSON("Failed to send email", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
