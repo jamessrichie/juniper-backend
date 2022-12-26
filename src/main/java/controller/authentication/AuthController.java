@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import model.*;
 import services.AuthTokenService;
+import services.MailService;
 import types.AuthTokens;
 import static helpers.Utilities.*;
 
@@ -19,11 +20,15 @@ public class AuthController {
     // Token authentication service
     private final AuthTokenService authTokenService;
 
+    // Mailing service
+    private final MailService mailService;
+
     /**
      * Initializes controller
      */
     public AuthController() throws IOException {
         authTokenService = new AuthTokenService();
+        mailService = new MailService();
     }
 
     /**
@@ -172,15 +177,42 @@ public class AuthController {
         }
     }
 
-    // POST
-    public ResponseEntity<Object> sendPasswordResetEmail() {
-        // generate new random string
-        // assign random string to database with expiration date
-        throw new NotYetImplementedException();
+    @RequestMapping(path = "/send-password-reset-email",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> sendPasswordResetEmail(@RequestBody Map<String, String> payload) {
+
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            System.out.println(payload);
+            String email = payload.get("email").toLowerCase();
+
+            // Gets the name of the user
+            ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
+            if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
+                return createStatusJSON(resolveEmailToUserNameStatus);
+            }
+            String name = resolveEmailToUserNameStatus.getBody();
+
+            // Gets the password reset code for the user
+            ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_resolveEmailToPasswordResetCode(email);
+            if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
+                return createStatusJSON("Failed to send email", resolveEmailToPasswordResetCodeStatus.getStatusCode());
+            }
+            String passwordResetCode = resolveEmailToPasswordResetCodeStatus.getBody();
+
+            // On success, send verification email
+            return mailService.sendPasswordResetEmail(name, email, passwordResetCode);
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
     }
 
     // GET
     public ResponseEntity<String> processResetCode() {
-        //
+        throw new NotYetImplementedException();
     }
 }

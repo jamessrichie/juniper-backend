@@ -13,6 +13,7 @@ import org.springframework.util.ResourceUtils;
 
 import exceptions.*;
 import static model.DatabaseStatements.*;
+import static helpers.Utilities.*;
 
 public class DatabaseConnection {
 
@@ -29,43 +30,47 @@ public class DatabaseConnection {
     private static final int HASH_STRENGTH = 65536;
     private static final int KEY_LENGTH = 128;
 
+    // Password reset code length
+    private static final int RESET_CODE_LENGTH = 64;
+
     // Number of attempts when encountering deadlock
     private static final int MAX_ATTEMPTS = 16;
 
     // Create statements
-    public PreparedStatement createCourseStatement;
-    public PreparedStatement createMediaStatement;
-    public PreparedStatement createRegistrationStatement;
-    public PreparedStatement createRelationshipStatement;
-    public PreparedStatement createUserStatement;
+    private PreparedStatement createCourseStatement;
+    private PreparedStatement createMediaStatement;
+    private PreparedStatement createRegistrationStatement;
+    private PreparedStatement createRelationshipStatement;
+    private PreparedStatement createUserStatement;
 
     // Delete statements
-    public PreparedStatement deleteMediaStatement;
-    public PreparedStatement deleteRegistrationStatement;
-    public PreparedStatement deleteRelationshipStatement;
+    private PreparedStatement deleteMediaStatement;
+    private PreparedStatement deleteRegistrationStatement;
+    private PreparedStatement deleteRelationshipStatement;
 
     // Update statements
-    public PreparedStatement updateBiographyStatement;
-    public PreparedStatement updateCardColorStatement;
-    public PreparedStatement updateCredentialsStatement;
-    public PreparedStatement updateEducationInformationStatement;
-    public PreparedStatement updateEmailVerificationStatement;
-    public PreparedStatement updatePersonalInformationStatement;
-    public PreparedStatement updateProfilePictureStatement;
-    public PreparedStatement updateRefreshTokenStatement;
-    public PreparedStatement updateRelationshipStatement;
+    private PreparedStatement updateBiographyStatement;
+    private PreparedStatement updateCardColorStatement;
+    private PreparedStatement updateCredentialsStatement;
+    private PreparedStatement updateEducationInformationStatement;
+    private PreparedStatement updateEmailVerificationStatement;
+    private PreparedStatement updatePasswordResetCodeStatement;
+    private PreparedStatement updatePersonalInformationStatement;
+    private PreparedStatement updateProfilePictureStatement;
+    private PreparedStatement updateRefreshTokenStatement;
+    private PreparedStatement updateRelationshipStatement;
 
     // Select statements
-    public PreparedStatement resolveCourseIdUniversityIdToCourseRecordStatement;
-    public PreparedStatement resolveEmailToUserRecordStatement;
-    public PreparedStatement resolveUserHandleToUserRecordStatement;
-    public PreparedStatement resolveUserIdOtherUserIdToRecordStatement;
-    public PreparedStatement resolveUserIdToUserRecordStatement;
+    private PreparedStatement resolveCourseIdUniversityIdToCourseRecordStatement;
+    private PreparedStatement resolveEmailToUserRecordStatement;
+    private PreparedStatement resolveUserHandleToUserRecordStatement;
+    private PreparedStatement resolveUserIdOtherUserIdToRecordStatement;
+    private PreparedStatement resolveUserIdToUserRecordStatement;
 
     // Boolean statements
-    public PreparedStatement checkEmailVerificationStatement;
-    public PreparedStatement checkVerificationCodeActiveStatement;
-    public PreparedStatement checkVerificationCodeUsedStatement;
+    private PreparedStatement checkEmailVerificationStatement;
+    private PreparedStatement checkVerificationCodeActiveStatement;
+    private PreparedStatement checkVerificationCodeUsedStatement;
 
     /**
      * Creates a connection to the database specified in dbconn.credentials
@@ -148,6 +153,7 @@ public class DatabaseConnection {
         updateCredentialsStatement = conn.prepareStatement(UPDATE_CREDENTIALS);
         updateEducationInformationStatement = conn.prepareStatement(UPDATE_EDUCATION_INFORMATION);
         updateEmailVerificationStatement = conn.prepareStatement(UPDATE_EMAIL_VERIFICATION);
+        updatePasswordResetCodeStatement = conn.prepareStatement(UPDATE_PASSWORD_RESET_CODE);
         updatePersonalInformationStatement = conn.prepareStatement(UPDATE_PERSONAL_INFORMATION);
         updateProfilePictureStatement = conn.prepareStatement(UPDATE_PROFILE_PICTURE);
         updateRefreshTokenStatement = conn.prepareStatement(UPDATE_REFRESH_TOKEN);
@@ -185,6 +191,7 @@ public class DatabaseConnection {
         updateCredentialsStatement.close();
         updateEducationInformationStatement.close();
         updateEmailVerificationStatement.close();
+        updatePasswordResetCodeStatement.close();
         updatePersonalInformationStatement.close();
         updateProfilePictureStatement.close();
         updateRefreshTokenStatement.close();
@@ -345,6 +352,49 @@ public class DatabaseConnection {
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Gets the password_reset_code for an email. If password_reset_code is null, then generate new one
+     *
+     * @effect tbl_users (RW), locking
+     * @return password_reset_code / 200 status code if email exists. otherwise, return null
+     */
+    public ResponseEntity<String> transaction_resolveEmailToPasswordResetCode(String email) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                // Retrieves the user record that the email is mapped to
+                ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
+                if (!resolveEmailToUserRecordRS.next()) {
+                    return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+                } else if (resolveEmailToUserRecordRS.getBoolean("has_verified_email")) {
+                    return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+                }
+
+                String passwordResetCode = resolveEmailToUserRecordRS.getString("password_reset_code");
+                resolveEmailToUserRecordRS.close();
+
+                // If password_reset_code is null, then generate new ones
+                if (passwordResetCode == null) {
+                    passwordResetCode = generateSecureString(RESET_CODE_LENGTH);
+
+                    executeUpdate(updatePasswordResetCodeStatement, passwordResetCode, email);
+                }
+
+                commitTransaction();
+                return new ResponseEntity<>(passwordResetCode, HttpStatus.OK);
+
+            } catch (Exception e) {
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return new ResponseEntity<>(null, HttpStatus.CONFLICT);
     }
 
     /**
