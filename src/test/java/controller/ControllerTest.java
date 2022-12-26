@@ -9,6 +9,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
 import org.junit.*;
 import org.junit.rules.*;
+import static org.junit.Assert.*;
 import org.apache.http.impl.client.*;
 import org.apache.http.client.methods.*;
 import org.springframework.http.HttpStatus;
@@ -30,8 +31,9 @@ public class ControllerTest {
 
     @BeforeClass
     public static void setUpBeforeClass() throws IOException {
-        DatabaseConnectionPool.enableTesting();
+        // do not swap these two lines of code or things will inexplicably break
         SpringApplication.run(RestServiceApplication.class);
+        DatabaseConnectionPool.enableTesting();
 
         Properties configProps = new Properties();
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
@@ -60,16 +62,6 @@ public class ControllerTest {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
         dbconn.revertToSavepoint(savepoint);
         DatabaseConnectionPool.releaseConnection(dbconn);
-    }
-
-    public static ResponseEntity<JsonObject> convertHttpResponseToResponseEntity(CloseableHttpResponse response) throws IOException {
-        System.out.println(EntityUtils.toString(response.getEntity(), "UTF-8"));
-        JsonObject responseBody = new JsonParser().parse(EntityUtils.toString(response.getEntity(), "UTF-8"))
-                .getAsJsonObject();
-        HttpStatus statusCode = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
-
-        return new ResponseEntity<>(responseBody, statusCode);
-
     }
 
     public static ResponseEntity<String> sendGetRequest(String apiPathUrl, Map<String, String> parameters) throws IOException {
@@ -103,14 +95,5 @@ public class ControllerTest {
         HttpStatus statusCode = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
 
         return new ResponseEntity<>(responseBody, statusCode);
-    }
-
-    @Test
-    public void getTest() throws IOException {
-        Map<String, String> parameters = new HashMap<>();
-        parameters.put("code", "z4zFXzHav1WsHmxiQ5EVbUcJVoTVcKbub9PsaL6rh8zF1y9HXd6BXpCQ9T6np2MH");
-
-        ResponseEntity<String> x = sendGetRequest("/user/verify", parameters);
-        System.out.println(x);
     }
 }
