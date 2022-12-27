@@ -264,7 +264,7 @@ public class DatabaseConnection {
      * @effect tbl_users (R), non-locking
      * @return user_id / 200 status code if user_handle exists. otherwise, return null
      */
-    public ResponseEntity<String> transaction_userHandleToUserId(String userHandle) {
+    public ResponseEntity<String> transaction_resolveUserHandleToUserId(String userHandle) {
         try {
             // Checks that user handle is not mapped to a user id
             ResultSet resolveUserHandleToUserRecordRS = executeQuery(resolveUserHandleToUserRecordStatement,
@@ -454,7 +454,7 @@ public class DatabaseConnection {
      * @effect tbl_users (RW), acquires lock
      * @return true / 200 status code iff user is successfully verified
      */
-    public ResponseEntity<Boolean> transaction_processVerificationCode(String verificationCode) {
+    public ResponseEntity<Boolean> transaction_processAccountVerificationCode(String verificationCode) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
@@ -499,7 +499,7 @@ public class DatabaseConnection {
      * @effect tbl_users (R), non-locking
      * @return true / 200 status code iff password reset code is valid
      */
-    public ResponseEntity<Boolean> transaction_checkPasswordResetCodeValid(String passwordResetCode) {
+    public ResponseEntity<Boolean> transaction_verifyPasswordResetCode(String passwordResetCode) {
         try {
             // Checks whether the password reset code exists and has not been used
             ResultSet checkVerificationCodeUsedRS = executeQuery(resolvePasswordResetCodeToUserRecord,

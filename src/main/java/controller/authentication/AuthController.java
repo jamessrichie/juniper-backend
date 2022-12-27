@@ -96,7 +96,7 @@ public class AuthController {
      *         otherwise, JSON object containing status message.
      *         200 status code iff success
      */
-    @RequestMapping(path = "/update-credentials",
+    @RequestMapping(path = "/update-login",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
@@ -128,7 +128,7 @@ public class AuthController {
      *
      * @return JSON object containing status message. 200 status code iff success
      */
-    @RequestMapping(path = "/revoke-tokens",
+    @RequestMapping(path = "/log-out",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
@@ -160,7 +160,7 @@ public class AuthController {
      *         otherwise, JSON object containing status message.
      *         200 status code iff success
      */
-    @RequestMapping(path = "/renew-tokens",
+    @RequestMapping(path = "/renew-session",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
@@ -192,7 +192,7 @@ public class AuthController {
      *
      * @return JSON object containing status message. 200 status code iff success or user does not exist
      */
-    @RequestMapping(path = "/send-password-reset-email",
+    @RequestMapping(path = "/request-reset-password",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
@@ -231,20 +231,20 @@ public class AuthController {
      * @apiNote GET request
      * @return HTML page. 200 status code iff success
      */
-    @RequestMapping(path = "/reset",
+    @RequestMapping(path = "/reset-password",
         method = RequestMethod.GET)
     public ResponseEntity<String> servePasswordResetPage(@RequestParam(value = "code") String passwordResetCode) {
 
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
-            ResponseEntity<Boolean> checkPasswordResetCodeValidStatus = dbconn.transaction_checkPasswordResetCodeValid(passwordResetCode);
+            ResponseEntity<Boolean> checkPasswordResetCodeValidStatus = dbconn.transaction_verifyPasswordResetCode(passwordResetCode);
             if (checkPasswordResetCodeValidStatus.getStatusCode() != HttpStatus.OK) {
                 return new ResponseEntity<>( "Invalid password reset code", HttpStatus.NOT_FOUND);
             } else {
                 return new ResponseEntity<>(loadTemplate("password_reset_page.html")
-                                            .replace("[[url]]", API_HOST + "/auth/process-reset")
-                                            .replace("[[passwordResetCode]]", passwordResetCode),
+                                            .replace("[[url]]", API_HOST + "/auth/reset-password")
+                                            .replace("[[code]]", passwordResetCode),
                         HttpStatus.OK);
             }
         } finally {
@@ -253,44 +253,37 @@ public class AuthController {
     }
 
     /**
-     * Resets the user's password
+     * Resets the user's password and redirects them to a status page
      *
      * @apiNote POST request
      * @return HTML page. 200 status code iff success
      */
-    @RequestMapping(path = "/process-reset",
+    @RequestMapping(path = "/reset-password",
         consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
         produces = MediaType.TEXT_HTML_VALUE,
         method = RequestMethod.POST)
-    public ResponseEntity<String> processResetCode(@RequestParam(value = "code") String passwordResetCode,
-                                                   @RequestParam(value = "password") String newPassword) {
+    public ResponseEntity<String> resetPassword(@RequestParam(value = "code") String passwordResetCode,
+                                                @RequestParam(value = "password") String password) {
 
         System.out.println("processResetCode");
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
-            System.out.println("A");
-            ResponseEntity<Boolean> processPasswordResetCodeStatus = dbconn.transaction_processPasswordResetCode(passwordResetCode, newPassword);
-            System.out.println(processPasswordResetCodeStatus);
-            System.out.println("B");
+            ResponseEntity<Boolean> processPasswordResetCodeStatus = dbconn.transaction_processPasswordResetCode(passwordResetCode, password);
 
             if (processPasswordResetCodeStatus.getStatusCode() == HttpStatus.OK) {
-                System.out.println("C1");
                 return new ResponseEntity<>(
-                        loadTemplate("verification_success_page.html").replace("[[year]]",
+                        loadTemplate("verify_account_success_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.OK);
             } else {
-                System.out.println("C2");
                 return new ResponseEntity<>(
-                        loadTemplate("verification_failed_page.html").replace("[[year]]",
+                        loadTemplate("verify_account_failed_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         processPasswordResetCodeStatus.getStatusCode());
             }
         } finally {
-            System.out.println("D");
             DatabaseConnectionPool.releaseConnection(dbconn);
-            System.out.println("E");
         }
     }
 }

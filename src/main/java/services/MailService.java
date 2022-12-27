@@ -82,8 +82,8 @@ public class MailService {
     public ResponseEntity<Object> sendVerificationEmail(String name, String toAddress, String verificationCode) {
         try {
             String subject = "Please verify your email";
-            String content = loadTemplate("verification_email.html");
-            String verificationUrl = API_HOST + "/user/verify?code=" + verificationCode;
+            String content = loadTemplate("verify_account_email.html");
+            String verificationUrl = API_HOST + "/user/verify-account?code=" + verificationCode;
 
             sendEmail(toAddress, subject, content, name, verificationUrl);
 
@@ -106,8 +106,8 @@ public class MailService {
     public ResponseEntity<Object> sendPasswordResetEmail(String name, String toAddress, String passwordResetCode) {
         try {
             String subject = "Password reset request";
-            String content = loadTemplate("forgot_password_email.html");
-            String passwordResetUrl = API_HOST + "/auth/reset?code=" + passwordResetCode;
+            String content = loadTemplate("password_reset_email.html");
+            String passwordResetUrl = API_HOST + "/auth/reset-password?code=" + passwordResetCode;
 
             sendEmail(toAddress, subject, content, name, passwordResetUrl);
 

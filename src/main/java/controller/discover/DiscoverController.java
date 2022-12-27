@@ -91,4 +91,73 @@ public class DiscoverController {
             DatabaseConnectionPool.releaseConnection(dbconn);
         }
     }
+
+    /**
+     * User rates other user
+     *
+     * @param payload JSON object containing "userId", "accessToken", "otherUserId", "rating" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/rate",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> rateUser(@RequestBody Map<String, String> payload) {
+
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String otherUserId = payload.get("otherUserId");
+            int rating = Integer.parseInt(payload.get("rating"));
+
+            return createStatusJSON(dbconn.transaction_rateUser(userId, otherUserId, rating));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
+    }
+
+    /**
+     * User blocks other user
+     *
+     * @param payload JSON object containing "userId", "accessToken", "otherUserId" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/block",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> blockUser(@RequestBody Map<String, String> payload) {
+
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            String otherUserId = payload.get("otherUserId");
+
+            return createStatusJSON(dbconn.transaction_blockUser(userId, otherUserId));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
+    }
 }

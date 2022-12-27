@@ -80,18 +80,18 @@ public class UserController {
     }
 
     /**
-     * Sends a verification email
+     * Sends an account verification email
      *
      * @param payload JSON object containing "email" field
      * @apiNote POST request
      *
      * @return JSON object containing status message. 200 status code iff success
      */
-    @RequestMapping(path = "/send-verification-email",
+    @RequestMapping(path = "/request-account-verification",
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
-    public ResponseEntity<Object> sendVerificationEmail(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Object> sendAccountVerificationEmail(@RequestBody Map<String, String> payload) {
 
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
@@ -126,33 +126,33 @@ public class UserController {
      * @apiNote GET request
      * @return HTML page. 200 status code iff success
      */
-    @RequestMapping(path = "/verify",
+    @RequestMapping(path = "/verify-account",
         method = RequestMethod.GET)
-    public ResponseEntity<String> processVerificationCode(@RequestParam(value = "code") String verificationCode) {
+    public ResponseEntity<String> verifyAccount(@RequestParam(value = "code") String verificationCode) {
 
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
-            ResponseEntity<Boolean> processVerificationCodeStatus = dbconn.transaction_processVerificationCode(verificationCode);
+            ResponseEntity<Boolean> processVerificationCodeStatus = dbconn.transaction_processAccountVerificationCode(verificationCode);
 
             return switch (processVerificationCodeStatus.getStatusCode()) {
                 case OK -> new ResponseEntity<>(
-                        loadTemplate("verification_success_page.html").replace("[[year]]",
+                        loadTemplate("verify_account_success_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.OK);
 
                 case BAD_REQUEST -> new ResponseEntity<>(
-                        loadTemplate("already_verified_page.html").replace("[[year]]",
+                        loadTemplate("verify_account_already_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.BAD_REQUEST);
 
                 case GONE -> new ResponseEntity<>(
-                        loadTemplate("verification_expired_page.html").replace("[[year]]",
+                        loadTemplate("verify_account_expired_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.GONE);
 
                 default -> new ResponseEntity<>(
-                        loadTemplate("verification_failed_page.html").replace("[[year]]",
+                        loadTemplate("verify_account_failed_page.html").replace("[[year]]",
                                                String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         processVerificationCodeStatus.getStatusCode());
             };
@@ -407,82 +407,13 @@ public class UserController {
     }
 
     /**
-     * User rates other user
-     *
-     * @param payload JSON object containing "userId", "accessToken", "otherUserId", "rating" fields
-     * @apiNote POST request
-     *
-     * @return JSON object containing boolean. 200 status code iff success
-     */
-    @RequestMapping(path = "/rate",
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE,
-        method = RequestMethod.POST)
-    public ResponseEntity<Object> rateUser(@RequestBody Map<String, String> payload) {
-
-        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
-
-		try {
-            String userId = payload.get("userId");
-            String accessToken = payload.get("accessToken");
-
-            // Verifies access token
-            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
-            }
-
-            String otherUserId = payload.get("otherUserId");
-            int rating = Integer.parseInt(payload.get("rating"));
-
-            return createStatusJSON(dbconn.transaction_rateUser(userId, otherUserId, rating));
-
-        } finally {
-            DatabaseConnectionPool.releaseConnection(dbconn);
-        }
-    }
-
-    /**
-     * User blocks other user
-     *
-     * @param payload JSON object containing "userId", "accessToken", "otherUserId" fields
-     * @apiNote POST request
-     *
-     * @return JSON object containing boolean. 200 status code iff success
-     */
-    @RequestMapping(path = "/block",
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE,
-        method = RequestMethod.POST)
-    public ResponseEntity<Object> blockUser(@RequestBody Map<String, String> payload) {
-
-        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
-
-		try {
-            String userId = payload.get("userId");
-            String accessToken = payload.get("accessToken");
-
-            // Verifies access token
-            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
-                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
-            }
-
-            String otherUserId = payload.get("otherUserId");
-
-            return createStatusJSON(dbconn.transaction_blockUser(userId, otherUserId));
-
-        } finally {
-            DatabaseConnectionPool.releaseConnection(dbconn);
-        }
-    }
-
-    /**
      * Generates a unique user handle from a name
      */
     private String generateUserHandle(DatabaseConnection dbconn, String name) {
         String userHandle = name.replaceAll("\\s", "") + "#" + String.format("%04d", new Random().nextInt(10000));
 
         // Check that user handle is unique
-        while (dbconn.transaction_userHandleToUserId(userHandle).getBody() != null) {
+        while (dbconn.transaction_resolveUserHandleToUserId(userHandle).getBody() != null) {
             userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
         }
         return userHandle;
