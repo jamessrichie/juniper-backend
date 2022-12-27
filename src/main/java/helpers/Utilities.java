@@ -1,5 +1,6 @@
 package helpers;
 
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.security.SecureRandom;
 
@@ -55,11 +56,21 @@ public final class Utilities {
      * Generates a cryptographically secure random string of specified length
      */
     public static String generateSecureString(int length) {
-        SecureRandom random = new SecureRandom();
+        int leftLimit = 48;
+        int rightLimit = 122;
 
-        byte[] bytes = new byte[length];
-        random.nextBytes(bytes);
+        try {
+            SecureRandom secureRandom = SecureRandom.getInstanceStrong();
 
-        return new String(bytes);
+            return secureRandom.ints(leftLimit, rightLimit + 1)
+              .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
+              .limit(length)
+              .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+              .toString();
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
     }
 }

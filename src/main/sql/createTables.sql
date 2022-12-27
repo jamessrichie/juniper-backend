@@ -4,20 +4,19 @@ CREATE TABLE tbl_universities
     university_name varchar(256) NOT NULL,
 
     PRIMARY KEY (university_id)
-
-) ENGINE = INNODB;
+);
 
 
 CREATE TABLE tbl_courses
 (
     course_id     varchar(36) NOT NULL,
+    course_code   varchar(16) NOT NULL,
     university_id varchar(36) NOT NULL,
 
-    PRIMARY KEY (course_id, university_id),
-    FOREIGN KEY (university_id) REFERENCES tbl_universities (university_id) ON UPDATE CASCADE ON DELETE RESTRICT
-
-) ENGINE = INNODB;
-
+    PRIMARY KEY (course_id),
+    FOREIGN KEY (university_id) REFERENCES tbl_universities (university_id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    UNIQUE (course_code, university_id)
+);
 
 CREATE TABLE tbl_users
 (
@@ -32,11 +31,11 @@ CREATE TABLE tbl_users
     profile_picture_url      varchar(512),
     verification_code        varchar(64)   NOT NULL,
     verification_timestamp   datetime      NOT NULL,
-    has_verified_email       boolean       NOT NULL,
+    has_verified_email       int           NOT NULL,
     password_reset_code      varchar(64),
     password_reset_timestamp datetime,
-    has_reset_password       boolean,
-    has_valid_profile        boolean       NOT NULL,
+    has_reset_password       int,
+    has_valid_profile        int           NOT NULL,
     card_color               varchar(15),
     date_of_birth            date,
     university_id            varchar(36),
@@ -46,25 +45,24 @@ CREATE TABLE tbl_users
     biography                text,
 
     PRIMARY KEY (user_id),
-    FOREIGN KEY (university_id) REFERENCES tbl_universities (university_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY (university_id) REFERENCES tbl_universities (university_id) ON UPDATE NO ACTION ON DELETE NO ACTION,
     UNIQUE (user_handle),
     UNIQUE (email),
     UNIQUE (verification_code)
-
-) ENGINE = INNODB;
+);
 
 
 CREATE TABLE tbl_registration
 (
-    user_id       varchar(36) NOT NULL,
-    course_id     varchar(36) NOT NULL,
-    university_id varchar(36) NOT NULL,
+    registration_id varchar(36) NOT NULL,
+    user_id         varchar(36) NOT NULL,
+    course_id       varchar(36) NOT NULL,
 
-    PRIMARY KEY (user_id, course_id, university_id),
-    FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
-    FOREIGN KEY (university_id) REFERENCES tbl_courses (university_id) ON UPDATE CASCADE ON DELETE CASCADE
-
-) ENGINE = INNODB;
+    PRIMARY KEY (registration_id),
+    FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE NO ACTION ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES tbl_courses (course_id) ON UPDATE NO ACTION ON DELETE CASCADE,
+    UNIQUE (user_id, course_id)
+);
 
 
 CREATE TABLE tbl_media
@@ -73,23 +71,24 @@ CREATE TABLE tbl_media
     ordering  int          NOT NULL,
     media_url varchar(512) NOT NULL,
 
-    PRIMARY KEY (user_id, ordering),
-    FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE
-
-) ENGINE = INNODB;
+    PRIMARY KEY (media_url),
+    FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE NO ACTION ON DELETE CASCADE,
+    UNIQUE (user_id, ordering)
+);
 
 
 CREATE TABLE tbl_relationships
 (
+    relationship_id     varchar(36) NOT NULL,
     user_id             varchar(36) NOT NULL,
     other_user_id       varchar(36) NOT NULL,
     relationship_status varchar(32) NOT NULL,
     rating              int,
 
-    PRIMARY KEY (user_id, other_user_id),
-    FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE,
-    FOREIGN KEY (other_user_id) REFERENCES tbl_users (user_id) ON UPDATE CASCADE ON DELETE CASCADE
-
-) ENGINE = INNODB;
+    PRIMARY KEY (relationship_id),
+    FOREIGN KEY (user_id) REFERENCES tbl_users (user_id) ON UPDATE NO ACTION ON DELETE CASCADE,
+    FOREIGN KEY (other_user_id) REFERENCES tbl_users (user_id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    UNIQUE (user_id, other_user_id)
+);
 
 CREATE INDEX idx_users_verification_timestamp ON tbl_users (verification_timestamp);

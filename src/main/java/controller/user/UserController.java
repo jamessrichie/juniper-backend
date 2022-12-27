@@ -63,12 +63,11 @@ public class UserController {
                 return mailService.sendPasswordResetEmail(name, email, passwordResetCode);
             }
 
-            String userId = UUID.randomUUID().toString();
             String userHandle = generateUserHandle(dbconn, name);
             String verificationCode = generateSecureString(64);
 
             // Creates the user
-            ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userId, userHandle, name, email, password, verificationCode);
+            ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userHandle, name, email, password, verificationCode);
             if (createUserStatus.getStatusCode() != HttpStatus.OK) {
                 return createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
             }

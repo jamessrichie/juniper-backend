@@ -11,7 +11,7 @@ public class DatabaseConnectionPoolTest {
     public final Timeout globalTimeout = Timeout.seconds(120);
 
     // DatabaseConnectionPool sizes
-    private final int INITIAL_POOL_SIZE = 10;
+    private final int INITIAL_POOL_SIZE = 5;
     private final int REDUCED_MAX_POOL_SIZE = 1;
     private final int MAX_POOL_SIZE = 20;
 
@@ -109,6 +109,22 @@ public class DatabaseConnectionPoolTest {
 
         // Check that the connection pool is reusing existing connections instead of generating new ones
         assert(reuseDuration < initializeDuration / MAX_POOL_SIZE);
+    }
+
+    @Test
+    public void testConnectionIdle() {
+        // Obtain the maximum number of connections
+        for (int i = 0; i < MAX_POOL_SIZE; i++) {
+            DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+            assert(dbconn.getTransactionCount() == 0);
+        }
+
+        DatabaseConnectionPool.releaseAllConnections();
+
+        for (int i = 0; i < MAX_POOL_SIZE; i++) {
+            DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+            assert(dbconn.getTransactionCount() == 0);
+        }
     }
 
     @Test

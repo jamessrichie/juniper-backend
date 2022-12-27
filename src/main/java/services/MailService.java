@@ -106,7 +106,7 @@ public class MailService {
     public ResponseEntity<Object> sendPasswordResetEmail(String name, String toAddress, String passwordResetCode) {
         try {
             String subject = "Password reset request";
-            String content = loadTemplate("password_reset_email.html");
+            String content = loadTemplate("forgot_password_email.html");
             String passwordResetUrl = API_HOST + "/auth/reset?code=" + passwordResetCode;
 
             sendEmail(toAddress, subject, content, name, passwordResetUrl);

@@ -3,8 +3,8 @@ package controller.authentication;
 import java.io.*;
 import java.util.*;
 
-import exceptions.NotYetImplementedException;
 import org.springframework.http.*;
+import org.springframework.util.*;
 import org.springframework.web.bind.annotation.*;
 
 import model.*;
@@ -23,12 +23,19 @@ public class AuthController {
     // Mailing service
     private final MailService mailService;
 
+    // Api host
+    private final String API_HOST;
+
     /**
      * Initializes controller
      */
     public AuthController() throws IOException {
         authTokenService = new AuthTokenService();
         mailService = new MailService();
+
+        Properties configProps = new Properties();
+        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
+        API_HOST = configProps.getProperty("API_HOST");
     }
 
     /**
@@ -60,7 +67,7 @@ public class AuthController {
             }
 
             // Check that the email has been verified
-            ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_verifyEmail(email);
+            ResponseEntity<Boolean> verifyEmailStatus = dbconn.transaction_checkEmailVerified(email);
             if (Boolean.FALSE.equals(verifyEmailStatus.getBody())) {
                 return createStatusJSON("Please verify your email before logging in", HttpStatus.BAD_REQUEST);
             }
@@ -218,8 +225,72 @@ public class AuthController {
         }
     }
 
-    // GET
-    public ResponseEntity<String> processResetCode() {
-        throw new NotYetImplementedException();
+    /**
+     * Generates and serves a password reset page
+     *
+     * @apiNote GET request
+     * @return HTML page. 200 status code iff success
+     */
+    @RequestMapping(path = "/reset",
+        method = RequestMethod.GET)
+    public ResponseEntity<String> servePasswordResetPage(@RequestParam(value = "code") String passwordResetCode) {
+
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            ResponseEntity<Boolean> checkPasswordResetCodeValidStatus = dbconn.transaction_checkPasswordResetCodeValid(passwordResetCode);
+            if (checkPasswordResetCodeValidStatus.getStatusCode() != HttpStatus.OK) {
+                return new ResponseEntity<>( "Invalid password reset code", HttpStatus.NOT_FOUND);
+            } else {
+                return new ResponseEntity<>(loadTemplate("password_reset_page.html")
+                                            .replace("[[url]]", API_HOST + "/auth/process-reset")
+                                            .replace("[[passwordResetCode]]", passwordResetCode),
+                        HttpStatus.OK);
+            }
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
+    }
+
+    /**
+     * Resets the user's password
+     *
+     * @apiNote POST request
+     * @return HTML page. 200 status code iff success
+     */
+    @RequestMapping(path = "/process-reset",
+        consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+        produces = MediaType.TEXT_HTML_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<String> processResetCode(@RequestParam(value = "code") String passwordResetCode,
+                                                   @RequestParam(value = "password") String newPassword) {
+
+        System.out.println("processResetCode");
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+		try {
+            System.out.println("A");
+            ResponseEntity<Boolean> processPasswordResetCodeStatus = dbconn.transaction_processPasswordResetCode(passwordResetCode, newPassword);
+            System.out.println(processPasswordResetCodeStatus);
+            System.out.println("B");
+
+            if (processPasswordResetCodeStatus.getStatusCode() == HttpStatus.OK) {
+                System.out.println("C1");
+                return new ResponseEntity<>(
+                        loadTemplate("verification_success_page.html").replace("[[year]]",
+                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.OK);
+            } else {
+                System.out.println("C2");
+                return new ResponseEntity<>(
+                        loadTemplate("verification_failed_page.html").replace("[[year]]",
+                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        processPasswordResetCodeStatus.getStatusCode());
+            }
+        } finally {
+            System.out.println("D");
+            DatabaseConnectionPool.releaseConnection(dbconn);
+            System.out.println("E");
+        }
     }
 }

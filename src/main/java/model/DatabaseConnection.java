@@ -8,10 +8,12 @@ import java.security.spec.*;
 
 import javax.crypto.*;
 import javax.crypto.spec.*;
+
 import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
 import exceptions.*;
+
 import static model.DatabaseStatements.*;
 import static helpers.Utilities.*;
 
@@ -35,6 +37,9 @@ public class DatabaseConnection {
 
     // Number of attempts when encountering deadlock
     private static final int MAX_ATTEMPTS = 16;
+
+    // System statements
+    private PreparedStatement systemTransactionCountStatement;
 
     // Create statements
     private PreparedStatement createCourseStatement;
@@ -63,14 +68,11 @@ public class DatabaseConnection {
     // Select statements
     private PreparedStatement resolveCourseIdUniversityIdToCourseRecordStatement;
     private PreparedStatement resolveEmailToUserRecordStatement;
+    private PreparedStatement resolvePasswordResetCodeToUserRecord;
     private PreparedStatement resolveUserHandleToUserRecordStatement;
-    private PreparedStatement resolveUserIdOtherUserIdToRecordStatement;
+    private PreparedStatement resolveUserIdOtherUserIdToRelationshipRecordStatement;
     private PreparedStatement resolveUserIdToUserRecordStatement;
-
-    // Boolean statements
-    private PreparedStatement checkEmailVerificationStatement;
-    private PreparedStatement checkVerificationCodeActiveStatement;
-    private PreparedStatement checkVerificationCodeUsedStatement;
+    private PreparedStatement resolveVerificationCodeToUserRecordStatement;
 
     /**
      * Creates a connection to the database specified in dbconn.credentials
@@ -100,11 +102,11 @@ public class DatabaseConnection {
         String endpoint = configProps.getProperty("RDS_ENDPOINT");
         String port = configProps.getProperty("RDS_PORT");
         String dbName = configProps.getProperty("RDS_DB_NAME");
-        String adminName = configProps.getProperty("RDS_USERNAME");
+        String username = configProps.getProperty("RDS_USERNAME");
         String password = configProps.getProperty("RDS_PASSWORD");
 
-        String connectionUrl = String.format("jdbc:mysql://%S:%s/%s?user=%s&password=%s",
-                                             endpoint, port, dbName, adminName, password);
+        String connectionUrl = String.format("jdbc:sqlserver://%s:%s;databaseName=%s;user=%s;password=%s",
+                endpoint, port, dbName, username, password);
         Connection conn = DriverManager.getConnection(connectionUrl);
 
         // Automatically commit after each statement
@@ -135,6 +137,9 @@ public class DatabaseConnection {
      * Prepare all the SQL statements
      */
     private void prepareStatements() throws SQLException {
+        // System statements
+        systemTransactionCountStatement = conn.prepareStatement(SYSTEM_TRANSACTION_COUNT);
+
         // Create statements
         createCourseStatement = conn.prepareStatement(CREATE_COURSE);
         createMediaStatement = conn.prepareStatement(CREATE_MEDIA);
@@ -162,17 +167,17 @@ public class DatabaseConnection {
         // Select statements
         resolveCourseIdUniversityIdToCourseRecordStatement = conn.prepareStatement(RESOLVE_COURSE_ID_UNIVERSITY_ID_TO_COURSE_RECORD);
         resolveEmailToUserRecordStatement = conn.prepareStatement(RESOLVE_EMAIL_TO_USER_RECORD);
+        resolvePasswordResetCodeToUserRecord = conn.prepareStatement(RESOLVE_PASSWORD_RESET_CODE_TO_USER_RECORD);
         resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
-        resolveUserIdOtherUserIdToRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_OTHER_USER_ID_TO_RECORD);
+        resolveUserIdOtherUserIdToRelationshipRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_OTHER_USER_ID_TO_RELATIONSHIP_RECORD);
         resolveUserIdToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_USER_RECORD);
-
-        // Boolean statements
-        checkEmailVerificationStatement = conn.prepareStatement(CHECK_EMAIL_VERIFICATION);
-        checkVerificationCodeActiveStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_ACTIVE);
-        checkVerificationCodeUsedStatement = conn.prepareStatement(CHECK_VERIFICATION_CODE_USED);
+        resolveVerificationCodeToUserRecordStatement = conn.prepareStatement(RESOLVE_VERIFICATION_CODE_TO_USER_RECORD);
     }
 
     private void closeStatements() throws SQLException {
+        // System statements
+        systemTransactionCountStatement.close();
+
         // Create statements
         createCourseStatement.close();
         createMediaStatement.close();
@@ -200,24 +205,21 @@ public class DatabaseConnection {
         // Select statements
         resolveCourseIdUniversityIdToCourseRecordStatement.close();
         resolveEmailToUserRecordStatement.close();
+        resolvePasswordResetCodeToUserRecord.close();
         resolveUserHandleToUserRecordStatement.close();
-        resolveUserIdOtherUserIdToRecordStatement.close();
+        resolveUserIdOtherUserIdToRelationshipRecordStatement.close();
         resolveUserIdToUserRecordStatement.close();
-
-        // Boolean statements
-        checkEmailVerificationStatement.close();
-        checkVerificationCodeActiveStatement.close();
-        checkVerificationCodeUsedStatement.close();
+        resolveVerificationCodeToUserRecordStatement.close();
     }
 
     /**
      * Creates a new user with an unverified email
      *
-     * @effect tbl_users (RW), acquires lock
      * @return true / 200 status code iff successfully created new user
+     * @effect tbl_users (RW), acquires lock
      */
-    public ResponseEntity<Boolean> transaction_createUser(String userId, String userHandle, String name, String email,
-                                                         String password, String verificationCode) {
+    public ResponseEntity<Boolean> transaction_createUser(String userHandle, String name, String email,
+                                                          String password, String verificationCode) {
 
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
@@ -227,30 +229,30 @@ public class DatabaseConnection {
                 ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
                 if (resolveEmailToUserRecordRS.next()) {
                     resolveEmailToUserRecordRS.close();
+
+                    rollbackTransaction();
                     return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
                 }
                 resolveEmailToUserRecordRS.close();
-
-                // Checks that user handle is not mapped to a user id
-                if (transaction_userHandleToUserId(userHandle).getBody() != null) {
-                    return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
-                }
 
                 byte[] salt = get_salt();
                 byte[] hash = get_hash(password, salt);
 
                 // Creates the user
-                executeUpdate(createUserStatement, userId, userHandle, name, email, salt, hash, verificationCode);
+                executeUpdate(createUserStatement, userHandle, name, email, salt, hash, verificationCode);
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -259,14 +261,14 @@ public class DatabaseConnection {
     /**
      * Gets the user_id for a user_handle
      *
-     * @effect tbl_users (R), non-locking
      * @return user_id / 200 status code if user_handle exists. otherwise, return null
+     * @effect tbl_users (R), non-locking
      */
     public ResponseEntity<String> transaction_userHandleToUserId(String userHandle) {
-        try{
+        try {
             // Checks that user handle is not mapped to a user id
             ResultSet resolveUserHandleToUserRecordRS = executeQuery(resolveUserHandleToUserRecordStatement,
-                                                                     userHandle);
+                    userHandle);
             if (!resolveUserHandleToUserRecordRS.next()) {
                 resolveUserHandleToUserRecordRS.close();
                 return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
@@ -277,15 +279,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(userId, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Gets the user_name for an email
      *
-     * @effect tbl_users (R), non-locking
      * @return user_name / 200 status code if email exists. otherwise, return null
+     * @effect tbl_users (R), non-locking
      */
     public ResponseEntity<String> transaction_resolveEmailToUserName(String email) {
         try {
@@ -301,15 +307,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(name, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Gets the user_id for an email
      *
-     * @effect tbl_users (R), non-locking
      * @return user_id / 200 status code if email exists. otherwise, return null
+     * @effect tbl_users (R), non-locking
      */
     public ResponseEntity<String> transaction_resolveEmailToUserId(String email) {
         try {
@@ -325,15 +335,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(userId, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Gets the verification_code for an email
      *
-     * @effect tbl_users (R), non-locking
      * @return verification_code / 200 status code if email exists. otherwise, return null
+     * @effect tbl_users (R), non-locking
      */
     public ResponseEntity<String> transaction_resolveEmailToVerificationCode(String email) {
         try {
@@ -350,15 +364,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(verificationCode, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Gets the password_reset_code for an email. If password_reset_code is null, then generate new one
      *
-     * @effect tbl_users (RW), locking
      * @return password_reset_code / 200 status code if email exists. otherwise, return null
+     * @effect tbl_users (RW), locking
      */
     public ResponseEntity<String> transaction_resolveEmailToPasswordResetCode(String email) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -368,88 +386,92 @@ public class DatabaseConnection {
                 // Retrieves the user record that the email is mapped to
                 ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
                 if (!resolveEmailToUserRecordRS.next()) {
+                    resolveEmailToUserRecordRS.close();
+
+                    rollbackTransaction();
                     return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
                 }
 
                 String passwordResetCode = resolveEmailToUserRecordRS.getString("password_reset_code");
+                Boolean hasResetPassword = resolveEmailToUserRecordRS.getBoolean("has_reset_password");
                 resolveEmailToUserRecordRS.close();
 
                 // If password_reset_code is null, then generate new ones
-                if (passwordResetCode == null) {
+                if (passwordResetCode == null || hasResetPassword) {
                     passwordResetCode = generateSecureString(RESET_CODE_LENGTH);
 
-                    executeUpdate(updatePasswordResetCodeStatement, passwordResetCode, email);
+                    executeUpdate(updatePasswordResetCodeStatement, passwordResetCode, 0, email);
                 }
 
                 commitTransaction();
                 return new ResponseEntity<>(passwordResetCode, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(null, HttpStatus.CONFLICT);
     }
 
     /**
-     * Verifies whether the user's email has been verified
+     * Checks whether the user's email has been verified
      *
+     * @return true / 200 status code iff email has been verified
      * @effect tbl_users (R), non-locking
-     * @return true / 200 status code iff user has been verified
      */
-    public ResponseEntity<Boolean> transaction_verifyEmail(String email) {
+    public ResponseEntity<Boolean> transaction_checkEmailVerified(String email) {
         try {
             // Retrieves the verification code that the email is mapped to
-            ResultSet checkEmailVerificationRS = executeQuery(checkEmailVerificationStatement, email);
-            if (!checkEmailVerificationRS.next()) {
-                checkEmailVerificationRS.close();
+            ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
+            if (!resolveEmailToUserRecordRS.next()) {
+                resolveEmailToUserRecordRS.close();
                 return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-            } else if (checkEmailVerificationRS.getBoolean("has_verified_email")) {
+            } else if (resolveEmailToUserRecordRS.getBoolean("has_verified_email")) {
                 return new ResponseEntity<>(true, HttpStatus.OK);
             } else {
                 return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
             }
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Processes the verification code
      *
-     * @effect tbl_users (RW), acquires lock
      * @return true / 200 status code iff user is successfully verified
+     * @effect tbl_users (RW), acquires lock
      */
     public ResponseEntity<Boolean> transaction_processVerificationCode(String verificationCode) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                // Checks whether the verification code has been used
-                // This check is done to distinguish between expired and used verification codes
-                ResultSet checkVerificationCodeUsedRS = executeQuery(checkVerificationCodeUsedStatement,
-                                                                     verificationCode);
-                checkVerificationCodeUsedRS.next();
-                if (checkVerificationCodeUsedRS.getBoolean("verification_code_used")) {
-                    checkVerificationCodeUsedRS.close();
+                ResultSet resolveVerificationCodeToUserRecordRS = executeQuery(resolveVerificationCodeToUserRecordStatement, verificationCode);
+                if (!resolveVerificationCodeToUserRecordRS.next()) {
+                    resolveVerificationCodeToUserRecordRS.close();
+
+                    rollbackTransaction();
+                    return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
+                } else if (resolveVerificationCodeToUserRecordRS.getBoolean("has_verified_email")) {
+                    resolveVerificationCodeToUserRecordRS.close();
+
+                    rollbackTransaction();
                     return new ResponseEntity<>(true, HttpStatus.BAD_REQUEST);
                 }
-                checkVerificationCodeUsedRS.close();
-
-                // Checks whether the verification code exists and is still active
-                ResultSet checkVerificationCodeActiveRS = executeQuery(checkVerificationCodeActiveStatement,
-                                                                       verificationCode);
-                checkVerificationCodeActiveRS.next();
-                if (!checkVerificationCodeActiveRS.getBoolean("verification_code_active")) {
-                    checkVerificationCodeActiveRS.close();
-                    return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-                }
-                checkVerificationCodeActiveRS.close();
+                resolveVerificationCodeToUserRecordRS.close();
 
                 // Verifies the user
                 executeUpdate(updateEmailVerificationStatement, 1, verificationCode);
@@ -458,12 +480,96 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
+        }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Checks whether the password reset code is valid
+     *
+     * @return true / 200 status code iff password reset code is valid
+     * @effect tbl_users (R), non-locking
+     */
+    public ResponseEntity<Boolean> transaction_checkPasswordResetCodeValid(String passwordResetCode) {
+        try {
+            // Checks whether the password reset code exists and has not been used
+            ResultSet checkVerificationCodeUsedRS = executeQuery(resolvePasswordResetCodeToUserRecord,
+                    passwordResetCode);
+            if (!checkVerificationCodeUsedRS.next() || checkVerificationCodeUsedRS.getBoolean("has_reset_password")) {
+                checkVerificationCodeUsedRS.close();
+                return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
+            }
+            checkVerificationCodeUsedRS.close();
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
+    }
+
+    /**
+     * Processes the password reset code
+     *
+     * @return true / 200 status code iff user's credentials have been successfully updated
+     * @effect tbl_users (RW), acquires lock
+     */
+    public ResponseEntity<Boolean> transaction_processPasswordResetCode(String passwordResetCode, String password) {
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
+
+                // Checks whether the password reset code exists and has not been used
+                ResultSet resolvePasswordResetCodeToUserRecordRS = executeQuery(resolvePasswordResetCodeToUserRecord,
+                        passwordResetCode);
+                if (!resolvePasswordResetCodeToUserRecordRS.next() ||
+                        resolvePasswordResetCodeToUserRecordRS.getBoolean("has_reset_password")) {
+                    resolvePasswordResetCodeToUserRecordRS.close();
+
+                    rollbackTransaction();
+                    return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
+                }
+                String userId = resolvePasswordResetCodeToUserRecordRS.getString("user_id");
+                String email = resolvePasswordResetCodeToUserRecordRS.getString("email");
+                resolvePasswordResetCodeToUserRecordRS.close();
+
+                byte[] newSalt = get_salt();
+                byte[] newHash = get_hash(password, newSalt);
+
+                // Updates the user's credentials
+                executeUpdate(updateCredentialsStatement, newSalt, newHash, userId);
+
+                // Disables the password reset code
+                executeUpdate(updatePasswordResetCodeStatement, null, 1, email);
+
+                commitTransaction();
+
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    e.printStackTrace();
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            } finally {
+                checkDanglingTransaction();
+            }
+
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
@@ -471,8 +577,8 @@ public class DatabaseConnection {
     /**
      * Verifies the user's credentials
      *
-     * @effect tbl_user (R), non-locking
      * @return true / 200 status code iff user's email and password matches
+     * @effect tbl_user (R), non-locking
      */
     public ResponseEntity<Boolean> transaction_verifyCredentials(String email, String password) {
         try {
@@ -495,15 +601,19 @@ public class DatabaseConnection {
             }
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's credentials
      *
+     * @return true / 200 status code iff user's credentials have been successfully updated
      * @effect tbl_user (RW), acquires lock
-     * @return true / 200 status code iff user's email and password have been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateCredentials(String userId, String password, String newPassword) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -515,33 +625,39 @@ public class DatabaseConnection {
                 if (!resolveEmailToUserRecordRS.next()) {
                     // If user does not exist, vaguely claim that credentials are incorrect
                     resolveEmailToUserRecordRS.close();
+
+                    rollbackTransaction();
                     return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
                 }
-                
+
                 byte[] salt = resolveEmailToUserRecordRS.getBytes("salt");
                 byte[] hash = resolveEmailToUserRecordRS.getBytes("hash");
                 resolveEmailToUserRecordRS.close();
 
                 // Check that credentials are correct
                 if (!Arrays.equals(hash, get_hash(password, salt))) {
+                    rollbackTransaction();
                     return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
                 }
 
                 byte[] newSalt = get_salt();
                 byte[] newHash = get_hash(newPassword, newSalt);
 
-                // Creates the user
+                // Updates the user's credentials
                 executeUpdate(updateCredentialsStatement, newSalt, newHash, userId);
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -550,14 +666,14 @@ public class DatabaseConnection {
     /**
      * Verifies the supplied refresh token
      *
-     * @effect tbl_user (R), non-locking
      * @return true / 200 status code iff refresh token is valid
+     * @effect tbl_user (R), non-locking
      */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenId(String userId, String tokenId) {
         try {
             // Retrieves the refresh token id that the user id is mapped to
             ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
-            if(!resolveUserIdToUserRecordRS.next()) {
+            if (!resolveUserIdToUserRecordRS.next()) {
                 resolveUserIdToUserRecordRS.close();
                 return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
@@ -572,21 +688,25 @@ public class DatabaseConnection {
             }
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Checks whether the supplied token family is current
      *
-     * @effect tbl_user (R), non-locking
      * @return true / 200 status code iff token family is current
+     * @effect tbl_user (R), non-locking
      */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenFamily(String userId, String tokenFamily) {
         try {
             // Retrieves the refresh token family that the user id is mapped to
             ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
-            if(!resolveUserIdToUserRecordRS.next()) {
+            if (!resolveUserIdToUserRecordRS.next()) {
                 resolveUserIdToUserRecordRS.close();
                 return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
             }
@@ -601,15 +721,19 @@ public class DatabaseConnection {
             }
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's refresh token
      *
-     * @effect tbl_user (W), non-locking
      * @return true / 200 status code iff refresh token has been successfully updated
+     * @effect tbl_user (W), non-locking
      */
     public ResponseEntity<Boolean> transaction_updateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
         try {
@@ -617,15 +741,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(true, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's personal information
      *
-     * @effect tbl_user (W), non-locking
      * @return true / 200 status iff user's personal information has been successfully updated
+     * @effect tbl_user (W), non-locking
      */
     public ResponseEntity<Boolean> transaction_updatePersonalInformation(String userId, String userHandle, String name,
                                                                          String email, String dateOfBirth) {
@@ -634,15 +762,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(true, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's education information
      *
-     * @effect tbl_user (W), non-locking
      * @return true / 200 status iff user's education information has been successfully updated
+     * @effect tbl_user (W), non-locking
      */
     public ResponseEntity<Boolean> transaction_updateEducationInformation(String userId, String universityId, String major,
                                                                           String standing, String gpa) {
@@ -651,15 +783,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(true, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's course registration information
      *
-     * @effect tbl_courses (RW), tbl_registration (W), acquires lock
      * @return true / 200 status iff user's course registration information has been successfully updated
+     * @effect tbl_courses (RW), tbl_registration (W), acquires lock
      */
     public ResponseEntity<Boolean> transaction_updateRegistrationInformation(String userId, String universityId, List<String> courses) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -671,24 +807,27 @@ public class DatabaseConnection {
                 for (String courseId : courses) {
 
                     ResultSet resolveCourseIdUniversityIdToCourseRecordRS = executeQuery(resolveCourseIdUniversityIdToCourseRecordStatement,
-                                                                                         courseId, universityId);
+                            courseId, universityId);
                     if (!resolveCourseIdUniversityIdToCourseRecordRS.next()) {
                         executeUpdate(createCourseStatement, courseId, universityId);
                     }
                     resolveCourseIdUniversityIdToCourseRecordRS.close();
 
-                    executeUpdate(createRegistrationStatement, userId, courseId, universityId);
+                    executeUpdate(createRegistrationStatement, userId, courseId);
                 }
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -697,8 +836,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's biography
      *
-     * @effect tbl_user (W), non-locking
      * @return true / 200 status iff user's biography has been successfully updated
+     * @effect tbl_user (W), non-locking
      */
     public ResponseEntity<Boolean> transaction_updateBiography(String userId, String biography) {
         try {
@@ -706,15 +845,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(true, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's card color
      *
-     * @effect tbl_user (W), non-locking
      * @return true / 200 status iff user's card color has been successfully updated
+     * @effect tbl_user (W), non-locking
      */
     public ResponseEntity<Boolean> transaction_updateCardColor(String userId, String cardColor) {
         try {
@@ -722,15 +865,19 @@ public class DatabaseConnection {
             return new ResponseEntity<>(true, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * Updates the user's media
      *
-     * @effect tbl_media (W), acquires lock
      * @return true / 200 status iff user's media has been successfully updated
+     * @effect tbl_media (W), acquires lock
      */
     public ResponseEntity<Boolean> transaction_updateMedia(String userId, List<String> mediaUrls) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -741,7 +888,6 @@ public class DatabaseConnection {
 
                 for (int i = 0; i < mediaUrls.size(); i++) {
                     String mediaUrl = mediaUrls.get(i);
-
                     executeUpdate(createMediaStatement, userId, i, mediaUrl);
                 }
 
@@ -749,11 +895,14 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -762,8 +911,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's profile picture
      *
-     * @effect tbl_user (W), non-locking
      * @return true / 200 status iff user's profile picture has been successfully updated
+     * @effect tbl_user (W), non-locking
      */
     public ResponseEntity<Boolean> transaction_updateProfilePicture(String userId, String profilePictureUrl) {
         try {
@@ -771,22 +920,26 @@ public class DatabaseConnection {
             return new ResponseEntity<>(true, HttpStatus.OK);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
         }
     }
 
     /**
      * User likes other user
      *
-     * @effect tbl_relationships (RW), acquires lock
      * @return relationship_status / 200 status if successfully liked other user
+     * @effect tbl_relationships (RW), acquires lock
      */
     public ResponseEntity<Boolean> transaction_likeUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, otherUserId, userId);
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRelationshipRecordStatement, otherUserId, userId);
 
                 if (!resolveUserIdOtherUserIdToRecordRS.next()) {
                     // If other user has no relationship with user, then user likes other user
@@ -803,11 +956,14 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -816,15 +972,15 @@ public class DatabaseConnection {
     /**
      * User dislikes other user
      *
-     * @effect tbl_relationships (RW), acquires lock
      * @return relationship_status / 200 status if successfully liked other user
+     * @effect tbl_relationships (RW), acquires lock
      */
     public ResponseEntity<Boolean> transaction_dislikeUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, otherUserId, userId);
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRelationshipRecordStatement, otherUserId, userId);
 
                 // If other user likes user, then delete that record
                 if (resolveUserIdOtherUserIdToRecordRS.next()) {
@@ -836,11 +992,14 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -849,16 +1008,19 @@ public class DatabaseConnection {
     /**
      * User rates other user
      *
-     * @effect tbl_relationships (RW), acquires lock
      * @return true / 200 status iff successfully rated other user
+     * @effect tbl_relationships (RW), acquires lock
      */
     public ResponseEntity<Boolean> transaction_rateUser(String userId, String otherUserId, int rating) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
-                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, userId, otherUserId);
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRelationshipRecordStatement, userId, otherUserId);
                 if (!resolveUserIdOtherUserIdToRecordRS.next() || !resolveUserIdOtherUserIdToRecordRS.getString("relationship_status").equals("friends")) {
+                    resolveUserIdOtherUserIdToRecordRS.close();
+
+                    rollbackTransaction();
                     return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
                 }
                 resolveUserIdOtherUserIdToRecordRS.close();
@@ -869,11 +1031,14 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -882,8 +1047,8 @@ public class DatabaseConnection {
     /**
      * User blocks other user
      *
-     * @effect tbl_relationships (W), acquires lock
      * @return true / 200 status iff successfully rated other user
+     * @effect tbl_relationships (W), acquires lock
      */
     public ResponseEntity<Boolean> transaction_blockUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -893,7 +1058,7 @@ public class DatabaseConnection {
                 Integer rating;
 
                 // If user rating exists, then preserve it
-                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRecordStatement, userId, otherUserId);
+                ResultSet resolveUserIdOtherUserIdToRecordRS = executeQuery(resolveUserIdOtherUserIdToRelationshipRecordStatement, userId, otherUserId);
                 if (resolveUserIdOtherUserIdToRecordRS.next()) {
                     rating = resolveUserIdOtherUserIdToRecordRS.getInt("rating");
                 } else {
@@ -907,11 +1072,14 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(true, HttpStatus.OK);
 
             } catch (Exception e) {
+                e.printStackTrace();
                 rollbackTransaction();
 
                 if (!isDeadLock(e)) {
                     return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
+            } finally {
+                checkDanglingTransaction();
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
@@ -964,6 +1132,42 @@ public class DatabaseConnection {
         }
     }
 
+    public int getTransactionCount() {
+        try {
+            ResultSet systemTransactionCountRS = executeQuery(systemTransactionCountStatement);
+            systemTransactionCountRS.next();
+
+            return systemTransactionCountRS.getInt("transaction_count");
+        } catch (Exception e) {
+            throw new IllegalStateException("Database error", e);
+        }
+    }
+
+    /**
+     * Throw IllegalStateException if transaction not completely complete, rollback
+     */
+    private void checkDanglingTransaction() {
+        try {
+            try {
+                ResultSet systemTransactionCountRS = executeQuery(systemTransactionCountStatement);
+                systemTransactionCountRS.next();
+
+                int transactionCount = systemTransactionCountRS.getInt("transaction_count");
+
+                if ((!testEnabled && transactionCount > 0) || (testEnabled && transactionCount > 1)) {
+                    throw new IllegalStateException(
+                            "Transaction not fully committed / rolled back. Number of transaction in process: " + transactionCount);
+                }
+            } finally {
+                if (!testEnabled) {
+                    conn.setAutoCommit(true);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Database error", e);
+        }
+    }
+
     /**
      * Creates a savepoint. throws an IllegalStateException if testing is not enabled
      */
@@ -987,7 +1191,6 @@ public class DatabaseConnection {
             testSavepointEnabled = false;
 
             conn.rollback(savepoint);
-            conn.releaseSavepoint(savepoint);
             conn.commit();
             conn.setAutoCommit(true);
 
@@ -1012,7 +1215,7 @@ public class DatabaseConnection {
      * Sets the statement's parameters to the method's arguments in the order they are passed in
      *
      * @param statement canned SQL statement
-     * @param args statement parameters
+     * @param args      statement parameters
      */
     private void setParameters(PreparedStatement statement, Object... args) throws SQLException {
         int parameterIndex = 1;
@@ -1031,7 +1234,7 @@ public class DatabaseConnection {
      * Executes the query statement with the specified parameters
      *
      * @param statement canned SQL statement
-     * @param args statement parameters
+     * @param args      statement parameters
      * @return query results as a ResultSet
      */
     private ResultSet executeQuery(PreparedStatement statement, Object... args) throws SQLException {
@@ -1043,7 +1246,7 @@ public class DatabaseConnection {
      * Executes the update statement with the specified parameters
      *
      * @param statement canned SQL statement
-     * @param args statement parameters
+     * @param args      statement parameters
      */
     private void executeUpdate(PreparedStatement statement, Object... args) throws SQLException {
         setParameters(statement, args);

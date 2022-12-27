@@ -16,7 +16,7 @@ public class DatabaseConnectionPool {
 
     private static Boolean testingEnabled = false;
 
-    private static final int INITIAL_POOL_SIZE = 10;
+    private static final int INITIAL_POOL_SIZE = 5;
     private static final int REDUCED_MAX_POOL_SIZE = 1;
     private static final int MAX_POOL_SIZE = 20;
 
