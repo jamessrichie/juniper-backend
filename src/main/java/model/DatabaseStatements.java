@@ -23,8 +23,8 @@ public final class DatabaseStatements {
 
     // Creates a user
     public static final String CREATE_USER = "INSERT INTO tbl_users " +
-                                             "VALUES (NEWID(), ?, ?, ?, ?, ?, null, null, null, ?, GETUTCDATE(), 0, " +
-                                             "null, null, null, 0, null, null, null, null, null, null, null)";
+                                             "VALUES (NEWID(), ?, ?, ?, ?, ?, null, null, ?, GETUTCDATE(), " +
+                                             "null, null, 0, null, null, null, null, null, null, null, null)";
 
     // Removes a user's media
     public static final String DELETE_MEDIA = "DELETE FROM tbl_media " +
@@ -62,14 +62,13 @@ public final class DatabaseStatements {
 
     // Sets a user's has_verified_email field
     public static final String UPDATE_EMAIL_VERIFICATION = "UPDATE tbl_users " +
-                                                           "SET has_verified_email = ? " +
+                                                           "SET verification_code = null " +
                                                            "WHERE verification_code = ?";
 
-    // Set's a user's password_reset_code, password_reset_timestamp, and has_reset_password fields
+    // Set's a user's password_reset_code, password_reset_timestamp fields
     public static final String UPDATE_PASSWORD_RESET_CODE = "UPDATE tbl_users " +
                                                             "SET password_reset_code = ?, " +
-                                                            "password_reset_timestamp = GETUTCDATE(), " +
-                                                            "has_reset_password = ? " +
+                                                            "password_reset_timestamp = GETUTCDATE() " +
                                                             "WHERE email = ?";
 
     // Sets a user's user_handle, user_name, email, date_of_birth, city, state, and country fields

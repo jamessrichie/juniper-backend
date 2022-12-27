@@ -355,11 +355,13 @@ public class DatabaseConnection {
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-            } else if (resolveEmailToUserRecordRS.getBoolean("has_verified_email")) {
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
             }
+
             String verificationCode = resolveEmailToUserRecordRS.getString("verification_code");
             resolveEmailToUserRecordRS.close();
+            if (verificationCode == null) {
+                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            }
 
             return new ResponseEntity<>(verificationCode, HttpStatus.OK);
 
@@ -378,7 +380,7 @@ public class DatabaseConnection {
      * @effect tbl_users (RW), locking
      * @return password_reset_code / 200 status code if email exists. otherwise, return null
      */
-    public ResponseEntity<String> transaction_resolveEmailToPasswordResetCode(String email) {
+    public ResponseEntity<String> transaction_generatePasswordResetCode(String email) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
@@ -391,17 +393,11 @@ public class DatabaseConnection {
                     rollbackTransaction();
                     return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
                 }
-
-                String passwordResetCode = resolveEmailToUserRecordRS.getString("password_reset_code");
-                Boolean hasResetPassword = resolveEmailToUserRecordRS.getBoolean("has_reset_password");
                 resolveEmailToUserRecordRS.close();
 
-                // If password_reset_code is null, then generate new ones
-                if (passwordResetCode == null || hasResetPassword) {
-                    passwordResetCode = generateSecureString(RESET_CODE_LENGTH);
-
-                    executeUpdate(updatePasswordResetCodeStatement, passwordResetCode, 0, email);
-                }
+                // Generate a new password reset code
+                String passwordResetCode = generateSecureString(RESET_CODE_LENGTH);
+                executeUpdate(updatePasswordResetCodeStatement, passwordResetCode, email);
 
                 commitTransaction();
                 return new ResponseEntity<>(passwordResetCode, HttpStatus.OK);
@@ -433,7 +429,7 @@ public class DatabaseConnection {
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
                 return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-            } else if (resolveEmailToUserRecordRS.getBoolean("has_verified_email")) {
+            } else if (resolveEmailToUserRecordRS.getString("verification_code") == null) {
                 return new ResponseEntity<>(true, HttpStatus.OK);
             } else {
                 return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
@@ -465,7 +461,7 @@ public class DatabaseConnection {
 
                     rollbackTransaction();
                     return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-                } else if (resolveVerificationCodeToUserRecordRS.getBoolean("has_verified_email")) {
+                } else if (resolveVerificationCodeToUserRecordRS.getString("verification_code") == null) {
                     resolveVerificationCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -474,7 +470,7 @@ public class DatabaseConnection {
                 resolveVerificationCodeToUserRecordRS.close();
 
                 // Verifies the user
-                executeUpdate(updateEmailVerificationStatement, 1, verificationCode);
+                executeUpdate(updateEmailVerificationStatement, verificationCode);
 
                 commitTransaction();
                 return new ResponseEntity<>(true, HttpStatus.OK);
@@ -504,7 +500,7 @@ public class DatabaseConnection {
             // Checks whether the password reset code exists and has not been used
             ResultSet checkVerificationCodeUsedRS = executeQuery(resolvePasswordResetCodeToUserRecord,
                     passwordResetCode);
-            if (!checkVerificationCodeUsedRS.next() || checkVerificationCodeUsedRS.getBoolean("has_reset_password")) {
+            if (!checkVerificationCodeUsedRS.next() || checkVerificationCodeUsedRS.getString("password_reset_code") == null) {
                 checkVerificationCodeUsedRS.close();
                 return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
@@ -535,7 +531,7 @@ public class DatabaseConnection {
                 ResultSet resolvePasswordResetCodeToUserRecordRS = executeQuery(resolvePasswordResetCodeToUserRecord,
                         passwordResetCode);
                 if (!resolvePasswordResetCodeToUserRecordRS.next() ||
-                        resolvePasswordResetCodeToUserRecordRS.getBoolean("has_reset_password")) {
+                     resolvePasswordResetCodeToUserRecordRS.getString("password_reset_code") == null) {
                     resolvePasswordResetCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -552,7 +548,7 @@ public class DatabaseConnection {
                 executeUpdate(updateCredentialsStatement, newSalt, newHash, userId);
 
                 // Disables the password reset code
-                executeUpdate(updatePasswordResetCodeStatement, null, 1, email);
+                executeUpdate(updatePasswordResetCodeStatement, null, email);
 
                 commitTransaction();
 

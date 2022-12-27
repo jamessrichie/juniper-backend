@@ -51,9 +51,12 @@ public class UserController {
 
             // Check that the email is not in use
             ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
+
+            // If email is in use, then send a reset password link
             if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
-                // Gets the password reset code for the user
-                ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_resolveEmailToPasswordResetCode(email);
+
+                // Generates a password reset code for the user
+                ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_generatePasswordResetCode(email);
                 if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
                     return createStatusJSON("Successfully sent email", HttpStatus.OK);
                 }
@@ -107,7 +110,9 @@ public class UserController {
 
             // Gets the verification code for the user
             ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
-            if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
+            if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST) {
+                return createStatusJSON("Account is already verified", resolveEmailToVerificationCodeStatus.getStatusCode());
+            } else if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
                 return createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
             }
             String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
@@ -137,23 +142,23 @@ public class UserController {
 
             return switch (processVerificationCodeStatus.getStatusCode()) {
                 case OK -> new ResponseEntity<>(
-                        loadTemplate("verify_account_success_page.html").replace("[[year]]",
-                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        loadTemplate("verify_account_success_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.OK);
 
                 case BAD_REQUEST -> new ResponseEntity<>(
-                        loadTemplate("verify_account_already_page.html").replace("[[year]]",
-                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        loadTemplate("verify_account_already_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.BAD_REQUEST);
 
-                case GONE -> new ResponseEntity<>(
-                        loadTemplate("verify_account_expired_page.html").replace("[[year]]",
-                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
-                        HttpStatus.GONE);
+                case NOT_FOUND -> new ResponseEntity<>(
+                        loadTemplate("verify_account_expired_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.NOT_FOUND);
 
                 default -> new ResponseEntity<>(
-                        loadTemplate("verify_account_failed_page.html").replace("[[year]]",
-                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        loadTemplate("verify_account_failed_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         processVerificationCodeStatus.getStatusCode());
             };
         } finally {

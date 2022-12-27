@@ -23,7 +23,7 @@ public class AuthController {
     // Mailing service
     private final MailService mailService;
 
-    // Api host
+    // API host
     private final String API_HOST;
 
     /**
@@ -206,12 +206,13 @@ public class AuthController {
             // Gets the name of the user
             ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
             if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
+                // If user does not exist, vaguely claim that email has been sent
                 return createStatusJSON("Successfully sent email", HttpStatus.OK);
             }
             String name = resolveEmailToUserNameStatus.getBody();
 
             // Gets the password reset code for the user
-            ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_resolveEmailToPasswordResetCode(email);
+            ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_generatePasswordResetCode(email);
             if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
                 return createStatusJSON("Failed to send email", HttpStatus.INTERNAL_SERVER_ERROR);
             }
@@ -239,14 +240,25 @@ public class AuthController {
 
 		try {
             ResponseEntity<Boolean> checkPasswordResetCodeValidStatus = dbconn.transaction_verifyPasswordResetCode(passwordResetCode);
-            if (checkPasswordResetCodeValidStatus.getStatusCode() != HttpStatus.OK) {
-                return new ResponseEntity<>( "Invalid password reset code", HttpStatus.NOT_FOUND);
-            } else {
-                return new ResponseEntity<>(loadTemplate("password_reset_page.html")
-                                            .replace("[[url]]", API_HOST + "/auth/reset-password")
-                                            .replace("[[code]]", passwordResetCode),
+
+            return switch (checkPasswordResetCodeValidStatus.getStatusCode()) {
+                case OK -> new ResponseEntity<>(
+                        loadTemplate("reset_password_page.html")
+                                .replace("[[url]]", API_HOST + "/auth/reset-password")
+                                .replace("[[code]]", passwordResetCode)
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.OK);
-            }
+
+                case UNAUTHORIZED -> new ResponseEntity<>(
+                        loadTemplate("reset_password_expired_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.NOT_FOUND);
+
+                default -> new ResponseEntity<>(
+                        loadTemplate("reset_password_failed_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        checkPasswordResetCodeValidStatus.getStatusCode());
+            };
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
         }
@@ -271,17 +283,22 @@ public class AuthController {
 		try {
             ResponseEntity<Boolean> processPasswordResetCodeStatus = dbconn.transaction_processPasswordResetCode(passwordResetCode, password);
 
-            if (processPasswordResetCodeStatus.getStatusCode() == HttpStatus.OK) {
-                return new ResponseEntity<>(
-                        loadTemplate("verify_account_success_page.html").replace("[[year]]",
-                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+            return switch (processPasswordResetCodeStatus.getStatusCode()) {
+                case OK -> new ResponseEntity<>(
+                        loadTemplate("reset_password_success_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(
-                        loadTemplate("verify_account_failed_page.html").replace("[[year]]",
-                                               String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+
+                case UNAUTHORIZED -> new ResponseEntity<>(
+                        loadTemplate("reset_password_expired_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
+                        HttpStatus.NOT_FOUND);
+
+                default -> new ResponseEntity<>(
+                        loadTemplate("reset_password_failed_page.html")
+                                .replace("[[year]]", String.valueOf(Calendar.getInstance().get(Calendar.YEAR))),
                         processPasswordResetCodeStatus.getStatusCode());
-            }
+            };
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
         }
