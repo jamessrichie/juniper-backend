@@ -215,8 +215,8 @@ public class DatabaseConnection {
     /**
      * Creates a new user with an unverified email
      *
-     * @return true / 200 status code iff successfully created new user
      * @effect tbl_users (RW), acquires lock
+     * @return true / 200 status code iff successfully created new user
      */
     public ResponseEntity<Boolean> transaction_createUser(String userHandle, String name, String email,
                                                           String password, String verificationCode) {
@@ -261,8 +261,8 @@ public class DatabaseConnection {
     /**
      * Gets the user_id for a user_handle
      *
-     * @return user_id / 200 status code if user_handle exists. otherwise, return null
      * @effect tbl_users (R), non-locking
+     * @return user_id / 200 status code if user_handle exists. otherwise, return null
      */
     public ResponseEntity<String> transaction_userHandleToUserId(String userHandle) {
         try {
@@ -290,8 +290,8 @@ public class DatabaseConnection {
     /**
      * Gets the user_name for an email
      *
-     * @return user_name / 200 status code if email exists. otherwise, return null
      * @effect tbl_users (R), non-locking
+     * @return user_name / 200 status code if email exists. otherwise, return null
      */
     public ResponseEntity<String> transaction_resolveEmailToUserName(String email) {
         try {
@@ -318,8 +318,8 @@ public class DatabaseConnection {
     /**
      * Gets the user_id for an email
      *
-     * @return user_id / 200 status code if email exists. otherwise, return null
      * @effect tbl_users (R), non-locking
+     * @return user_id / 200 status code if email exists. otherwise, return null
      */
     public ResponseEntity<String> transaction_resolveEmailToUserId(String email) {
         try {
@@ -346,8 +346,8 @@ public class DatabaseConnection {
     /**
      * Gets the verification_code for an email
      *
-     * @return verification_code / 200 status code if email exists. otherwise, return null
      * @effect tbl_users (R), non-locking
+     * @return verification_code / 200 status code if email exists. otherwise, return null
      */
     public ResponseEntity<String> transaction_resolveEmailToVerificationCode(String email) {
         try {
@@ -375,8 +375,8 @@ public class DatabaseConnection {
     /**
      * Gets the password_reset_code for an email. If password_reset_code is null, then generate new one
      *
-     * @return password_reset_code / 200 status code if email exists. otherwise, return null
      * @effect tbl_users (RW), locking
+     * @return password_reset_code / 200 status code if email exists. otherwise, return null
      */
     public ResponseEntity<String> transaction_resolveEmailToPasswordResetCode(String email) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -423,8 +423,8 @@ public class DatabaseConnection {
     /**
      * Checks whether the user's email has been verified
      *
-     * @return true / 200 status code iff email has been verified
      * @effect tbl_users (R), non-locking
+     * @return true / 200 status code iff email has been verified
      */
     public ResponseEntity<Boolean> transaction_checkEmailVerified(String email) {
         try {
@@ -451,8 +451,8 @@ public class DatabaseConnection {
     /**
      * Processes the verification code
      *
-     * @return true / 200 status code iff user is successfully verified
      * @effect tbl_users (RW), acquires lock
+     * @return true / 200 status code iff user is successfully verified
      */
     public ResponseEntity<Boolean> transaction_processVerificationCode(String verificationCode) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -496,8 +496,8 @@ public class DatabaseConnection {
     /**
      * Checks whether the password reset code is valid
      *
-     * @return true / 200 status code iff password reset code is valid
      * @effect tbl_users (R), non-locking
+     * @return true / 200 status code iff password reset code is valid
      */
     public ResponseEntity<Boolean> transaction_checkPasswordResetCodeValid(String passwordResetCode) {
         try {
@@ -523,8 +523,8 @@ public class DatabaseConnection {
     /**
      * Processes the password reset code
      *
-     * @return true / 200 status code iff user's credentials have been successfully updated
      * @effect tbl_users (RW), acquires lock
+     * @return true / 200 status code iff user's credentials have been successfully updated
      */
     public ResponseEntity<Boolean> transaction_processPasswordResetCode(String passwordResetCode, String password) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -577,8 +577,8 @@ public class DatabaseConnection {
     /**
      * Verifies the user's credentials
      *
-     * @return true / 200 status code iff user's email and password matches
      * @effect tbl_user (R), non-locking
+     * @return true / 200 status code iff user's email and password matches
      */
     public ResponseEntity<Boolean> transaction_verifyCredentials(String email, String password) {
         try {
@@ -612,8 +612,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's credentials
      *
-     * @return true / 200 status code iff user's credentials have been successfully updated
      * @effect tbl_user (RW), acquires lock
+     * @return true / 200 status code iff user's credentials have been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateCredentials(String userId, String password, String newPassword) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -666,8 +666,8 @@ public class DatabaseConnection {
     /**
      * Verifies the supplied refresh token
      *
-     * @return true / 200 status code iff refresh token is valid
      * @effect tbl_user (R), non-locking
+     * @return true / 200 status code iff refresh token is valid
      */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenId(String userId, String tokenId) {
         try {
@@ -699,8 +699,8 @@ public class DatabaseConnection {
     /**
      * Checks whether the supplied token family is current
      *
-     * @return true / 200 status code iff token family is current
      * @effect tbl_user (R), non-locking
+     * @return true / 200 status code iff token family is current
      */
     public ResponseEntity<Boolean> transaction_verifyRefreshTokenFamily(String userId, String tokenFamily) {
         try {
@@ -732,8 +732,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's refresh token
      *
-     * @return true / 200 status code iff refresh token has been successfully updated
      * @effect tbl_user (W), non-locking
+     * @return true / 200 status code iff refresh token has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
         try {
@@ -752,8 +752,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's personal information
      *
-     * @return true / 200 status iff user's personal information has been successfully updated
      * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's personal information has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updatePersonalInformation(String userId, String userHandle, String name,
                                                                          String email, String dateOfBirth) {
@@ -773,8 +773,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's education information
      *
-     * @return true / 200 status iff user's education information has been successfully updated
      * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's education information has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateEducationInformation(String userId, String universityId, String major,
                                                                           String standing, String gpa) {
@@ -794,8 +794,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's course registration information
      *
-     * @return true / 200 status iff user's course registration information has been successfully updated
      * @effect tbl_courses (RW), tbl_registration (W), acquires lock
+     * @return true / 200 status iff user's course registration information has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateRegistrationInformation(String userId, String universityId, List<String> courses) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -836,8 +836,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's biography
      *
-     * @return true / 200 status iff user's biography has been successfully updated
      * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's biography has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateBiography(String userId, String biography) {
         try {
@@ -856,8 +856,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's card color
      *
-     * @return true / 200 status iff user's card color has been successfully updated
      * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's card color has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateCardColor(String userId, String cardColor) {
         try {
@@ -876,8 +876,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's media
      *
-     * @return true / 200 status iff user's media has been successfully updated
      * @effect tbl_media (W), acquires lock
+     * @return true / 200 status iff user's media has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateMedia(String userId, List<String> mediaUrls) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -911,8 +911,8 @@ public class DatabaseConnection {
     /**
      * Updates the user's profile picture
      *
-     * @return true / 200 status iff user's profile picture has been successfully updated
      * @effect tbl_user (W), non-locking
+     * @return true / 200 status iff user's profile picture has been successfully updated
      */
     public ResponseEntity<Boolean> transaction_updateProfilePicture(String userId, String profilePictureUrl) {
         try {
@@ -931,8 +931,8 @@ public class DatabaseConnection {
     /**
      * User likes other user
      *
-     * @return relationship_status / 200 status if successfully liked other user
      * @effect tbl_relationships (RW), acquires lock
+     * @return relationship_status / 200 status if successfully liked other user
      */
     public ResponseEntity<Boolean> transaction_likeUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -972,8 +972,8 @@ public class DatabaseConnection {
     /**
      * User dislikes other user
      *
-     * @return relationship_status / 200 status if successfully liked other user
      * @effect tbl_relationships (RW), acquires lock
+     * @return relationship_status / 200 status if successfully liked other user
      */
     public ResponseEntity<Boolean> transaction_dislikeUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -1008,8 +1008,8 @@ public class DatabaseConnection {
     /**
      * User rates other user
      *
-     * @return true / 200 status iff successfully rated other user
      * @effect tbl_relationships (RW), acquires lock
+     * @return true / 200 status iff successfully rated other user
      */
     public ResponseEntity<Boolean> transaction_rateUser(String userId, String otherUserId, int rating) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
@@ -1047,8 +1047,8 @@ public class DatabaseConnection {
     /**
      * User blocks other user
      *
-     * @return true / 200 status iff successfully rated other user
      * @effect tbl_relationships (W), acquires lock
+     * @return true / 200 status iff successfully rated other user
      */
     public ResponseEntity<Boolean> transaction_blockUser(String userId, String otherUserId) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {

@@ -216,18 +216,18 @@ public class AuthTokenServiceTest {
             String userId = dbconn.transaction_resolveEmailToUserId("email").getBody();
 
             // Generate access and refresh tokens
-            AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens(dbconn,userId);
+            AuthTokens tokens = authTokenService.generateAccessAndRefreshTokens(dbconn, userId);
             String refreshToken = tokens.refreshToken;
 
             // Use the first refresh token from first family. verification should succeed
-            tokens = authTokenService.verifyRefreshToken(dbconn,userId, refreshToken);
+            tokens = authTokenService.verifyRefreshToken(dbconn, userId, refreshToken);
             assertNotNull(tokens);
 
             // Save the second refresh token from first family
             String newRefreshToken = tokens.refreshToken;
 
             // Reuse the first refresh token from first family. verification should fail and the token family should be revoked
-            tokens = authTokenService.verifyRefreshToken(dbconn,userId, refreshToken);
+            tokens = authTokenService.verifyRefreshToken(dbconn, userId, refreshToken);
             assertNull(tokens);
 
             // Generate access and refresh tokens from a new token family
@@ -236,11 +236,11 @@ public class AuthTokenServiceTest {
             refreshToken = tokens.refreshToken;
 
             // Use the new refresh token from second family. verification should succeed
-            tokens = authTokenService.verifyRefreshToken(dbconn,userId, refreshToken);
+            tokens = authTokenService.verifyRefreshToken(dbconn, userId, refreshToken);
             assertNotNull(tokens);
 
             // Use the second refresh token from first family. verification should fail since the token family has been revoked
-            tokens = authTokenService.verifyRefreshToken(dbconn,userId, newRefreshToken);
+            tokens = authTokenService.verifyRefreshToken(dbconn, userId, newRefreshToken);
             assertNull(tokens);
 
         } finally {
