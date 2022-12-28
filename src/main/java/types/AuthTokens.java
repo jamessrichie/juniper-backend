@@ -9,4 +9,14 @@ public class AuthTokens {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("AuthTokens {\n");
+        sb.append("    accessToken: ").append(accessToken).append("\n");
+        sb.append("    refreshToken: ").append(refreshToken).append("\n");
+        sb.append("}");
+        return sb.toString();
+    }
 }
