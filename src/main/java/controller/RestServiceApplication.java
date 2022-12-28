@@ -12,6 +12,11 @@ import java.time.format.*;
 
 @SpringBootApplication
 public class RestServiceApplication {
+
+    public static void main(String[] args) throws IOException {
+        run();
+    }
+
     public static void run() throws IOException {
         Properties configProps = new Properties();
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
