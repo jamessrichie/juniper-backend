@@ -13,6 +13,7 @@ import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
 import exceptions.*;
+import types.*;
 
 import static model.DatabaseStatements.*;
 import static helpers.Utilities.*;
@@ -46,6 +47,7 @@ public class DatabaseConnection {
     private PreparedStatement createMediaStatement;
     private PreparedStatement createRegistrationStatement;
     private PreparedStatement createRelationshipStatement;
+    private PreparedStatement createUniversityStatement;
     private PreparedStatement createUserStatement;
 
     // Delete statements
@@ -66,11 +68,17 @@ public class DatabaseConnection {
     private PreparedStatement updateRelationshipStatement;
 
     // Select statements
-    private PreparedStatement resolveCourseIdUniversityIdToCourseRecordStatement;
+    private PreparedStatement resolveCourseCodeUniversityIdToCourseRecordStatement;
     private PreparedStatement resolveEmailToUserRecordStatement;
     private PreparedStatement resolvePasswordResetCodeToUserRecord;
+    private PreparedStatement resolveUniversityIdToUniversityRecordStatement;
+    private PreparedStatement resolveUniversityNameToUniversityRecordStatement;
     private PreparedStatement resolveUserHandleToUserRecordStatement;
     private PreparedStatement resolveUserIdOtherUserIdToRelationshipRecordStatement;
+    private PreparedStatement resolveUserIdToCourseRecordsStatement;
+    private PreparedStatement resolveUserIdToMediaRecordsStatement;
+    private PreparedStatement resolveUserIdToNumberOfFriendsStatement;
+    private PreparedStatement resolveUserIdToRatingStatement;
     private PreparedStatement resolveUserIdToUserRecordStatement;
     private PreparedStatement resolveVerificationCodeToUserRecordStatement;
 
@@ -145,6 +153,7 @@ public class DatabaseConnection {
         createMediaStatement = conn.prepareStatement(CREATE_MEDIA);
         createRegistrationStatement = conn.prepareStatement(CREATE_REGISTRATION);
         createRelationshipStatement = conn.prepareStatement(CREATE_RELATIONSHIP);
+        createUniversityStatement = conn.prepareStatement(CREATE_UNIVERSITY);
         createUserStatement = conn.prepareStatement(CREATE_USER);
 
         // Delete statements
@@ -165,11 +174,17 @@ public class DatabaseConnection {
         updateRelationshipStatement = conn.prepareStatement(UPDATE_RELATIONSHIP);
 
         // Select statements
-        resolveCourseIdUniversityIdToCourseRecordStatement = conn.prepareStatement(RESOLVE_COURSE_ID_UNIVERSITY_ID_TO_COURSE_RECORD);
+        resolveCourseCodeUniversityIdToCourseRecordStatement = conn.prepareStatement(RESOLVE_COURSE_CODE_UNIVERSITY_ID_TO_COURSE_RECORD);
         resolveEmailToUserRecordStatement = conn.prepareStatement(RESOLVE_EMAIL_TO_USER_RECORD);
         resolvePasswordResetCodeToUserRecord = conn.prepareStatement(RESOLVE_PASSWORD_RESET_CODE_TO_USER_RECORD);
+        resolveUniversityIdToUniversityRecordStatement = conn.prepareStatement(RESOLVE_UNIVERSITY_ID_TO_UNIVERSITY_RECORD);
+        resolveUniversityNameToUniversityRecordStatement = conn.prepareStatement(RESOLVE_UNIVERSITY_NAME_TO_UNIVERSITY_RECORD);
         resolveUserHandleToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_HANDLE_TO_USER_RECORD);
         resolveUserIdOtherUserIdToRelationshipRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_OTHER_USER_ID_TO_RELATIONSHIP_RECORD);
+        resolveUserIdToCourseRecordsStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_COURSE_RECORDS);
+        resolveUserIdToMediaRecordsStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_MEDIA_RECORDS);
+        resolveUserIdToNumberOfFriendsStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_NUMBER_OF_FRIENDS);
+        resolveUserIdToRatingStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_RATING);
         resolveUserIdToUserRecordStatement = conn.prepareStatement(RESOLVE_USER_ID_TO_USER_RECORD);
         resolveVerificationCodeToUserRecordStatement = conn.prepareStatement(RESOLVE_VERIFICATION_CODE_TO_USER_RECORD);
     }
@@ -183,6 +198,7 @@ public class DatabaseConnection {
         createMediaStatement.close();
         createRegistrationStatement.close();
         createRelationshipStatement.close();
+        createUniversityStatement.close();
         createUserStatement.close();
 
         // Delete statements
@@ -203,11 +219,17 @@ public class DatabaseConnection {
         updateRelationshipStatement.close();
 
         // Select statements
-        resolveCourseIdUniversityIdToCourseRecordStatement.close();
+        resolveCourseCodeUniversityIdToCourseRecordStatement.close();
         resolveEmailToUserRecordStatement.close();
         resolvePasswordResetCodeToUserRecord.close();
+        resolveUniversityIdToUniversityRecordStatement.close();
+        resolveUniversityNameToUniversityRecordStatement.close();
         resolveUserHandleToUserRecordStatement.close();
         resolveUserIdOtherUserIdToRelationshipRecordStatement.close();
+        resolveUserIdToCourseRecordsStatement.close();
+        resolveUserIdToMediaRecordsStatement.close();
+        resolveUserIdToNumberOfFriendsStatement.close();
+        resolveUserIdToRatingStatement.close();
         resolveUserIdToUserRecordStatement.close();
         resolveVerificationCodeToUserRecordStatement.close();
     }
@@ -347,23 +369,57 @@ public class DatabaseConnection {
      * Gets the verification_code for an email
      *
      * @effect tbl_users (R), non-locking
-     * @return verification_code / 200 status code if email exists. otherwise, return null
+     * @return verification_code / 200 status code if email exists and is unverified.
+     *         verification_code / 400 status code if email exists and is verified.
+     *         null / 404 status code if email does not exist
      */
     public ResponseEntity<String> transaction_resolveEmailToVerificationCode(String email) {
         try {
             // Retrieves the user record that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
+                resolveEmailToUserRecordRS.close();
                 return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             }
 
             String verificationCode = resolveEmailToUserRecordRS.getString("verification_code");
+            if (resolveEmailToUserRecordRS.getBoolean("verification_confirmed")) {
+                resolveEmailToUserRecordRS.close();
+                return new ResponseEntity<>(verificationCode, HttpStatus.BAD_REQUEST);
+            }
             resolveEmailToUserRecordRS.close();
-            if (verificationCode == null) {
-                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(verificationCode, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
+    }
+
+    /**
+     * Gets the password_reset_code for an email
+     *
+     * @effect tbl_users (R), non-locking
+     * @return password_reset_code / 200 status code if email exists. otherwise, return null
+     */
+    public ResponseEntity<String> transaction_resolveEmailToPasswordResetCode(String email) {
+        try {
+            // Retrieves the user record that the email is mapped to
+            ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
+            if (!resolveEmailToUserRecordRS.next()) {
+                resolveEmailToUserRecordRS.close();
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             }
 
-            return new ResponseEntity<>(verificationCode, HttpStatus.OK);
+            String passwordResetCode = resolveEmailToUserRecordRS.getString("password_reset_code");
+            resolveEmailToUserRecordRS.close();
+            if (passwordResetCode == null) {
+                return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            }
+            return new ResponseEntity<>(passwordResetCode, HttpStatus.OK);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -429,7 +485,7 @@ public class DatabaseConnection {
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
                 return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-            } else if (resolveEmailToUserRecordRS.getString("verification_code") == null) {
+            } else if (resolveEmailToUserRecordRS.getBoolean("verification_confirmed")) {
                 return new ResponseEntity<>(true, HttpStatus.OK);
             } else {
                 return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
@@ -461,7 +517,7 @@ public class DatabaseConnection {
 
                     rollbackTransaction();
                     return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
-                } else if (resolveVerificationCodeToUserRecordRS.getString("verification_code") == null) {
+                } else if (resolveVerificationCodeToUserRecordRS.getBoolean("verification_confirmed")) {
                     resolveVerificationCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -772,19 +828,41 @@ public class DatabaseConnection {
      * @effect tbl_user (W), non-locking
      * @return true / 200 status iff user's education information has been successfully updated
      */
-    public ResponseEntity<Boolean> transaction_updateEducationInformation(String userId, String universityId, String major,
+    public ResponseEntity<Boolean> transaction_updateEducationInformation(String userId, String universityName, String major,
                                                                           String standing, String gpa) {
-        try {
-            executeUpdate(updateEducationInformationStatement, universityId, major, standing, gpa, userId);
-            return new ResponseEntity<>(true, HttpStatus.OK);
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            try {
+                beginTransaction();
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                ResultSet resolveUniversityNameToUniversityRecordRS = executeQuery(resolveUniversityNameToUniversityRecordStatement, universityName);
+                if (!resolveUniversityNameToUniversityRecordRS.next()) {
+                    executeUpdate(createUniversityStatement, universityName);
+                    resolveUniversityNameToUniversityRecordRS.close();
 
-        } finally {
-            checkDanglingTransaction();
+                    // Update result set
+                    resolveUniversityNameToUniversityRecordRS = executeQuery(resolveUniversityNameToUniversityRecordStatement, universityName);
+                    resolveUniversityNameToUniversityRecordRS.next();
+                }
+                String universityId = resolveUniversityNameToUniversityRecordRS.getString("university_id");
+                resolveUniversityNameToUniversityRecordRS.close();
+
+                executeUpdate(updateEducationInformationStatement, universityId, major, standing, gpa, userId);
+
+                commitTransaction();
+                return new ResponseEntity<>(true, HttpStatus.OK);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                rollbackTransaction();
+
+                if (!isDeadLock(e)) {
+                    return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            } finally {
+                checkDanglingTransaction();
+            }
         }
+        return new ResponseEntity<>(false, HttpStatus.CONFLICT);
     }
 
     /**
@@ -793,21 +871,35 @@ public class DatabaseConnection {
      * @effect tbl_courses (RW), tbl_registration (W), acquires lock
      * @return true / 200 status iff user's course registration information has been successfully updated
      */
-    public ResponseEntity<Boolean> transaction_updateRegistrationInformation(String userId, String universityId, List<String> courses) {
+    public ResponseEntity<Boolean> transaction_updateRegistrationInformation(String userId, String universityName, List<String> courseCodes) {
         for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
             try {
                 beginTransaction();
 
+                // Get university id
+                ResultSet resolveUniversityNameToUniversityRecordRS = executeQuery(resolveUniversityNameToUniversityRecordStatement, universityName);
+                if (!resolveUniversityNameToUniversityRecordRS.next()) {
+                    resolveUniversityNameToUniversityRecordRS.close();
+                    return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
+                }
+                String universityId = resolveUniversityNameToUniversityRecordRS.getString("university_id");
+                resolveUniversityNameToUniversityRecordRS.close();
+
                 executeUpdate(deleteRegistrationStatement, userId);
 
-                for (String courseId : courses) {
+                for (String courseCode : courseCodes) {
+                    // If course does not exist, then create new course
+                    ResultSet resolveCourseCodeUniversityIdToCourseRecordRS = executeQuery(resolveCourseCodeUniversityIdToCourseRecordStatement, courseCode, universityId);
+                    if (!resolveCourseCodeUniversityIdToCourseRecordRS.next()) {
+                        executeUpdate(createCourseStatement, courseCode, universityId);
+                        resolveCourseCodeUniversityIdToCourseRecordRS.close();
 
-                    ResultSet resolveCourseIdUniversityIdToCourseRecordRS = executeQuery(resolveCourseIdUniversityIdToCourseRecordStatement,
-                            courseId, universityId);
-                    if (!resolveCourseIdUniversityIdToCourseRecordRS.next()) {
-                        executeUpdate(createCourseStatement, courseId, universityId);
+                        // Update result set
+                        resolveCourseCodeUniversityIdToCourseRecordRS = executeQuery(resolveCourseCodeUniversityIdToCourseRecordStatement, courseCode, universityId);
+                        resolveCourseCodeUniversityIdToCourseRecordRS.next();
                     }
-                    resolveCourseIdUniversityIdToCourseRecordRS.close();
+                    String courseId = resolveCourseCodeUniversityIdToCourseRecordRS.getString("course_id");
+                    resolveCourseCodeUniversityIdToCourseRecordRS.close();
 
                     executeUpdate(createRegistrationStatement, userId, courseId);
                 }
@@ -1079,6 +1171,104 @@ public class DatabaseConnection {
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Gets the complete profile for user
+     *
+     * @effect tbl_courses (R), tbl_media (R), tbl_registration (R), tbl_relationships (R), tbl_universities (R), tbl_users (R), non-locking
+     * @return User object / 200 status iff successfully retrieved complete profile
+     */
+    public ResponseEntity<User> transaction_getUser(String userId) {
+        try {
+            ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
+            if (!resolveUserIdToUserRecordRS.next()) {
+                resolveUserIdToUserRecordRS.close();
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            }
+            String userHandle = resolveUserIdToUserRecordRS.getString("user_handle");
+            String userName = resolveUserIdToUserRecordRS.getString("user_name");
+            String cardColor = resolveUserIdToUserRecordRS.getString("card_color");
+            String dateOfBirth = resolveUserIdToUserRecordRS.getString("date_of_birth");
+            String universityId = resolveUserIdToUserRecordRS.getString("university_id");
+            String major = resolveUserIdToUserRecordRS.getString("major");
+            String standing = resolveUserIdToUserRecordRS.getString("standing");
+            String gpa = resolveUserIdToUserRecordRS.getString("gpa");
+            String biography = resolveUserIdToUserRecordRS.getString("biography");
+            String profilePictureUrl = resolveUserIdToUserRecordRS.getString("profile_picture_url");
+            resolveUserIdToUserRecordRS.close();
+
+            ResultSet resolveUniversityIdToUniversityRecordRS = executeQuery(resolveUniversityIdToUniversityRecordStatement, universityId);
+            String universityName = (!resolveUniversityIdToUniversityRecordRS.next()) ? null : resolveUniversityIdToUniversityRecordRS.getString("university_name");
+            resolveUniversityIdToUniversityRecordRS.close();
+
+            ResultSet resolveUserIdToNumberOfFriendsRS = executeQuery(resolveUserIdToNumberOfFriendsStatement, userId);
+            String numberOfFriends = (!resolveUserIdToNumberOfFriendsRS.next()) ? null : resolveUserIdToNumberOfFriendsRS.getString("number_of_friends");
+            resolveUserIdToNumberOfFriendsRS.close();
+
+            ResultSet resolveUserIdToRatingRS = executeQuery(resolveUserIdToRatingStatement, userId);
+            String rating = (!resolveUserIdToRatingRS.next()) ? null : resolveUserIdToRatingRS.getString("rating");
+            resolveUserIdToRatingRS.close();
+
+            List<String> mediaUrls = new ArrayList<>();
+            ResultSet resolveUserIdToMediaRecordsRS = executeQuery(resolveUserIdToMediaRecordsStatement, userId);
+            while (resolveUserIdToMediaRecordsRS.next()) {
+                String mediaUrl = resolveUserIdToMediaRecordsRS.getString("media_url");
+                mediaUrls.add(mediaUrl);
+            }
+            resolveUserIdToMediaRecordsRS.close();
+
+            List<String> courseCodes = new ArrayList<>();
+            ResultSet resolveUserIdToCourseRecordsRS = executeQuery(resolveUserIdToCourseRecordsStatement, userId);
+            while (resolveUserIdToCourseRecordsRS.next()) {
+                String courseCode = resolveUserIdToCourseRecordsRS.getString("course_code");
+                courseCodes.add(courseCode);
+            }
+            resolveUserIdToCourseRecordsRS.close();
+
+            User user = new User(userId, userHandle, userName, cardColor, dateOfBirth, universityName, major, standing,
+                                 gpa, biography, profilePictureUrl, numberOfFriends, rating, mediaUrls, courseCodes);
+
+            return new ResponseEntity<>(user, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
+    }
+
+    /**
+     * Gets the mini profile for user
+     *
+     * @effect tbl_users (R), non-locking
+     * @return User object / 200 status iff successfully retrieved complete profile
+     */
+    public ResponseEntity<UserMini> transaction_getUserMini(String userId) {
+        try {
+            ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, userId);
+            if (!resolveUserIdToUserRecordRS.next()) {
+                resolveUserIdToUserRecordRS.close();
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            }
+            String userHandle = resolveUserIdToUserRecordRS.getString("user_handle");
+            String userName = resolveUserIdToUserRecordRS.getString("user_name");
+            String profilePictureUrl = resolveUserIdToUserRecordRS.getString("profile_picture_url");
+            resolveUserIdToUserRecordRS.close();
+
+            UserMini user = new UserMini(userId, userHandle, userName, profilePictureUrl);
+
+            return new ResponseEntity<>(user, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
     }
 
     public List<String> transaction_loadUsers() {
