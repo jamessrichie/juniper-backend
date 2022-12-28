@@ -2,7 +2,10 @@ package model;
 
 import java.io.*;
 import java.sql.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.time.*;
+import java.time.format.*;
 import java.security.*;
 import java.security.spec.*;
 
@@ -511,8 +514,11 @@ public class DatabaseConnection {
             try {
                 beginTransaction();
 
+                // Checks whether verification code exists, has not expired, and has not been used
                 ResultSet resolveVerificationCodeToUserRecordRS = executeQuery(resolveVerificationCodeToUserRecordStatement, verificationCode);
-                if (!resolveVerificationCodeToUserRecordRS.next()) {
+                if (!resolveVerificationCodeToUserRecordRS.next() ||
+                    parseDateTimeString(resolveVerificationCodeToUserRecordRS.getString("verification_timestamp"))
+                        .isBefore(Instant.now().minus(24, ChronoUnit.HOURS))) {
                     resolveVerificationCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -523,6 +529,7 @@ public class DatabaseConnection {
                     rollbackTransaction();
                     return new ResponseEntity<>(true, HttpStatus.BAD_REQUEST);
                 }
+
                 resolveVerificationCodeToUserRecordRS.close();
 
                 // Verifies the user
@@ -553,10 +560,11 @@ public class DatabaseConnection {
      */
     public ResponseEntity<Boolean> transaction_verifyPasswordResetCode(String passwordResetCode) {
         try {
-            // Checks whether the password reset code exists and has not been used
-            ResultSet checkVerificationCodeUsedRS = executeQuery(resolvePasswordResetCodeToUserRecord,
-                    passwordResetCode);
-            if (!checkVerificationCodeUsedRS.next() || checkVerificationCodeUsedRS.getString("password_reset_code") == null) {
+            // Checks whether the password reset code exists, has not expired, and has not been used
+            ResultSet checkVerificationCodeUsedRS = executeQuery(resolvePasswordResetCodeToUserRecord, passwordResetCode);
+            if (!checkVerificationCodeUsedRS.next() || checkVerificationCodeUsedRS.getString("password_reset_code") == null ||
+                parseDateTimeString(checkVerificationCodeUsedRS.getString("password_reset_timestamp"))
+                        .isBefore(Instant.now().minus(15, ChronoUnit.MINUTES))) {
                 checkVerificationCodeUsedRS.close();
                 return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
@@ -586,8 +594,9 @@ public class DatabaseConnection {
                 // Checks whether the password reset code exists and has not been used
                 ResultSet resolvePasswordResetCodeToUserRecordRS = executeQuery(resolvePasswordResetCodeToUserRecord,
                         passwordResetCode);
-                if (!resolvePasswordResetCodeToUserRecordRS.next() ||
-                     resolvePasswordResetCodeToUserRecordRS.getString("password_reset_code") == null) {
+                if (!resolvePasswordResetCodeToUserRecordRS.next() || resolvePasswordResetCodeToUserRecordRS.getString("password_reset_code") == null ||
+                    parseDateTimeString(resolvePasswordResetCodeToUserRecordRS.getString("password_reset_timestamp"))
+                        .isBefore(Instant.now().minus(15, ChronoUnit.MINUTES))) {
                     resolvePasswordResetCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -1455,7 +1464,7 @@ public class DatabaseConnection {
      * Generates a cryptographic hash
      *
      * @param password password to be hashed
-     * @param salt     salt for the has
+     * @param salt     salt for the hash
      * @return cryptographic hash
      */
     private byte[] get_hash(String password, byte[] salt) {
@@ -1469,5 +1478,17 @@ public class DatabaseConnection {
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
             throw new IllegalStateException();
         }
+    }
+
+    /**
+     * Parses a DateTime string
+     *
+     * @param dateTime in yyyy-MM-dd HH:mm:ss.SSS format
+     * @return Instant object representing UTC time
+     */
+    private Instant parseDateTimeString(String dateTime) {
+        return LocalDateTime.parse(dateTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
+                                                              .atZone(ZoneId.of("UTC"))
+                                                              .toInstant();
     }
 }

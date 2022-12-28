@@ -52,6 +52,7 @@ public class UserController {
             // Check that the email is not in use
             ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
 
+            // TODO: if email is in use and account is unverified, delete old account and send confirmation email. if email is in use and account is verified, then send reset email
             // If email is in use, then send a reset password link
             if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
 
