@@ -34,7 +34,7 @@ public class UserController {
      * @param payload JSON object containing "name", "email", "password" fields
      * @apiNote POST request
      *
-     * @return JSON object containing status message. 200 status code iff success
+     * @return JSON object containing status message. 200 status code iff success or user already exists
      */
     @RequestMapping(path = "/create",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -88,7 +88,7 @@ public class UserController {
      * @param payload JSON object containing "email" field
      * @apiNote POST request
      *
-     * @return JSON object containing status message. 200 status code iff success
+     * @return JSON object containing status message. 200 status code iff success or user does not exist
      */
     @RequestMapping(path = "/request-account-verification",
         consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -104,21 +104,23 @@ public class UserController {
             // Gets the name of the user
             ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
             if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
-                return createStatusJSON(resolveEmailToUserNameStatus);
+                // If user does not exist, vaguely claim that email has been sent
+                return createStatusJSON("Successfully sent email", HttpStatus.OK);
             }
             String name = resolveEmailToUserNameStatus.getBody();
 
             // Gets the verification code for the user
             ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
-            if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST) {
-                return createStatusJSON("Account is already verified", resolveEmailToVerificationCodeStatus.getStatusCode());
-            } else if (resolveEmailToVerificationCodeStatus.getStatusCode() != HttpStatus.OK) {
+            if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.OK ||
+                resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST) {
+
+                // If account exists, send verification email
+                String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
+                return mailService.sendVerificationEmail(name, email, verificationCode);
+
+            } else {
                 return createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
             }
-            String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
-
-            // On success, send verification email
-            return mailService.sendVerificationEmail(name, email, verificationCode);
 
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
@@ -196,8 +198,7 @@ public class UserController {
             String email = payload.get("email").toLowerCase();
             String dateOfBirth = payload.get("dateOfBirth");
 
-            return createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name,
-                                                                                           email, dateOfBirth));
+            return createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name, email, dateOfBirth));
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
         }
@@ -206,7 +207,7 @@ public class UserController {
     /**
      * Updates the user's education information
      *
-     * @param payload JSON object containing "userId", "accessToken", "universityId", "major", "standing", "gpa" fields
+     * @param payload JSON object containing "userId", "accessToken", "universityName", "major", "standing", "gpa" fields
      * @apiNote POST request
      *
      * @return JSON object containing boolean. 200 status code iff success
@@ -228,12 +229,12 @@ public class UserController {
                 return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
             }
 
-            String universityId = payload.get("universityId");
+            String universityName = payload.get("universityName");
             String major = payload.get("major");
             String standing = payload.get("standing");
             String gpa = payload.get("gpa");
 
-            return createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityId, major, standing, gpa));
+            return createStatusJSON(dbconn.transaction_updateEducationInformation(userId, universityName, major, standing, gpa));
 
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
@@ -243,7 +244,7 @@ public class UserController {
     /**
      * Updates the user's course registration information
      *
-     * @param payload JSON object containing "userId", "accessToken", "universityId", "courses[]" fields
+     * @param payload JSON object containing "userId", "accessToken", "universityName", "courseCodes[]" fields
      * @apiNote POST request
      *
      * @return JSON object containing boolean. 200 status code iff success
@@ -265,10 +266,10 @@ public class UserController {
                 return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
             }
 
-            String universityId = payload.get("universityId").toString();
-            List<String> courses = (List<String>) payload.get("courses");
+            String universityName = payload.get("universityName").toString();
+            List<String> courseCodes = (List<String>) payload.get("courseCodes");
 
-            return createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityId, courses));
+            return createStatusJSON(dbconn.transaction_updateRegistrationInformation(userId, universityName, courseCodes));
 
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);

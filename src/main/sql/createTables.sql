@@ -3,7 +3,8 @@ CREATE TABLE tbl_universities
     university_id   varchar(36)  NOT NULL,
     university_name varchar(256) NOT NULL,
 
-    PRIMARY KEY (university_id)
+    PRIMARY KEY (university_id),
+    UNIQUE (university_name)
 );
 
 
@@ -30,6 +31,7 @@ CREATE TABLE tbl_users
     refresh_token_family     varchar(36),
     verification_code        varchar(64),
     verification_timestamp   datetime,
+    verification_confirmed   int           NOT NULL,
     password_reset_code      varchar(64),
     password_reset_timestamp datetime,
     has_valid_profile        int           NOT NULL,
