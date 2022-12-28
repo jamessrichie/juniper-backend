@@ -6,19 +6,18 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.util.ResourceUtils;
 
 import java.io.*;
-import java.sql.*;
 import java.util.*;
 import java.time.*;
 import java.time.format.*;
 
 @SpringBootApplication
 public class RestServiceApplication {
-    public static void main(String[] args) throws SQLException, IOException {
+    public static void run() throws IOException {
         Properties configProps = new Properties();
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
         String API_VERSION = configProps.getProperty("API_VERSION");
 
-        SpringApplication.run(RestServiceApplication.class, args);
+        SpringApplication.run(RestServiceApplication.class);
 
         System.out.println();
         System.out.println("                                        /$$                                       ");
