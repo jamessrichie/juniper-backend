@@ -114,7 +114,7 @@ public class AuthTokenServiceTest {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
         try {
-            ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userHandle", "userName", "email", "password", "verificationCode");
+            ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser("userHandle", "name", "email", "password", "verificationCode");
 
             assertEquals(HttpStatus.OK, createUserStatus.getStatusCode());
 
@@ -157,7 +157,7 @@ public class AuthTokenServiceTest {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
         try {
-            dbconn.transaction_createUser("userHandle", "userName", "email", "password", "verificationCode");
+            dbconn.transaction_createUser("userHandle", "name", "email", "password", "verificationCode");
 
             String userId = dbconn.transaction_resolveEmailToUserId("email").getBody();
 
@@ -179,7 +179,7 @@ public class AuthTokenServiceTest {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
         try {
-            dbconn.transaction_createUser("userHandle", "userName", "email", "password", "verificationCode");
+            dbconn.transaction_createUser("userHandle", "name", "email", "password", "verificationCode");
 
             String userId = dbconn.transaction_resolveEmailToUserId("email").getBody();
 
@@ -211,7 +211,7 @@ public class AuthTokenServiceTest {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
         try {
-            dbconn.transaction_createUser("userHandle", "userName", "email", "password", "verificationCode");
+            dbconn.transaction_createUser("userHandle", "name", "email", "password", "verificationCode");
 
             String userId = dbconn.transaction_resolveEmailToUserId("email").getBody();
 
