@@ -1,9 +1,6 @@
 package model;
 
-import org.springframework.cglib.core.Block;
-
 import java.sql.*;
-import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.*;
 
@@ -32,10 +29,8 @@ public class DatabaseConnectionPool {
             lock = new ReentrantLock();
 
             idleConnections = new LinkedBlockingQueue<>();
-            for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
-                idleConnections.put(new DatabaseConnection());
-            }
             activeConnections = new LinkedBlockingQueue<>();
+            initializePool(INITIAL_POOL_SIZE);
 
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -93,11 +88,21 @@ public class DatabaseConnectionPool {
     }
 
     /**
+     * Returns the total number of active and idle connections in the connection pool
+     *
+     * @return total number of active and idle connections in the connection pool
+     */
+    public static int size() {
+        return idleConnections.size() + activeConnections.size();
+    }
+
+    /**
      * Enables the use of testing features
      */
     public static void enableTesting() {
         if (!testingEnabled) {
             testingEnabled = true;
+            initializePool(INITIAL_POOL_SIZE);
         }
     }
 
@@ -106,10 +111,8 @@ public class DatabaseConnectionPool {
      */
     public static void disableTesting() {
         if (testingEnabled) {
-            if (maxPoolSize == REDUCED_MAX_POOL_SIZE) {
-                restorePoolSize();
-            }
             testingEnabled = false;
+            initializePool(INITIAL_POOL_SIZE);
         }
     }
 
@@ -123,6 +126,43 @@ public class DatabaseConnectionPool {
             }
         } else {
             throw new IllegalStateException("Enable testing to use releaseAllConnections()");
+        }
+    }
+
+    /**
+     * Closes all connections in the pool. These connections can no longer be used
+     */
+    public static void closeAllConnections() {
+        closeConnections(idleConnections);
+        closeConnections(activeConnections);
+    }
+
+    /**
+     * Reduces the number of connections in the pool to 1 and sets them in accordance with the testingEnabled flag.
+     * This forces all methods to utilize the same connection.
+     * Very expensive method call and only meant for JUnit tests
+     */
+    public static void reducePoolSize() {
+        if (testingEnabled) {
+            maxPoolSize = REDUCED_MAX_POOL_SIZE;
+            initializePool(REDUCED_MAX_POOL_SIZE);
+
+        } else {
+            throw new IllegalStateException("Enable testing to use reducePoolSize()");
+        }
+    }
+
+    /**
+     * Reverts the connection pool to its initial size in accordance with the testingEnabled flag.
+     * Very expensive method call and only meant for JUnit tests
+     */
+    public static void restorePoolSize() {
+        if (testingEnabled) {
+            maxPoolSize = MAX_POOL_SIZE;
+            initializePool(INITIAL_POOL_SIZE);
+
+        } else {
+            throw new IllegalStateException("Enable testing to use restorePoolSize()");
         }
     }
 
@@ -141,70 +181,22 @@ public class DatabaseConnectionPool {
     }
 
     /**
-     * Closes all connections in the pool. These connections can no longer be used
-     */
-    private static void closeAllConnections() {
-        if (testingEnabled) {
-            closeConnections(idleConnections);
-            closeConnections(activeConnections);
-        } else {
-            throw new IllegalStateException("Enable testing to use closeAllConnections()");
-        }
-    }
-
-    /**
-     * Reduces the number of connections in the pool to 1.
-     * This forces all methods to utilize the same connection.
-     * Very expensive method call and only meant for JUnit tests
-     */
-    public static void reducePoolSize() {
-        if (testingEnabled) {
-            closeAllConnections();
-            idleConnections.clear();
-            activeConnections.clear();
-
-            maxPoolSize = REDUCED_MAX_POOL_SIZE;
-
-            try {
-                idleConnections.put(new DatabaseConnection(true));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            throw new IllegalStateException("Enable testing to use reducePoolSize()");
-        }
-    }
-
-    /**
-     * Reverts the connection pool to its initial size with new connections.
-     * Very expensive method call and only meant for JUnit tests
-     */
-    public static void restorePoolSize() {
-        if (testingEnabled) {
-            closeAllConnections();
-            idleConnections.clear();
-            activeConnections.clear();
-
-            maxPoolSize = MAX_POOL_SIZE;
-
-            try {
-                for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
-                    idleConnections.put(new DatabaseConnection());
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            throw new IllegalStateException("Enable testing to use restorePoolSize()");
-        }
-    }
-
-    /**
-     * Returns the total number of active and idle connections in the connection pool
+     * Initializes the connections in the pool in accordance with the testingEnabled flag
      *
-     * @return total number of active and idle connections in the connection pool
+     * @param size number of connections to initialize
      */
-    public static int size() {
-        return idleConnections.size() + activeConnections.size();
+    private static void initializePool(int size) {
+        try {
+            closeAllConnections();
+            idleConnections.clear();
+            activeConnections.clear();
+
+            for (int i = 0; i < size; i++) {
+                idleConnections.put(new DatabaseConnection(testingEnabled));
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

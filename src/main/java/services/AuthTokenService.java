@@ -24,7 +24,7 @@ import types.AuthTokens;
  */
 public class AuthTokenService {
 
-    private final String API_HOST;
+    private final String apiHost;
 
     private final Algorithm HMAC256Algorithm;
     private final JWTVerifier accessTokenVerifier;
@@ -38,20 +38,20 @@ public class AuthTokenService {
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:credentials/jwt.credentials")));
 
-        API_HOST = configProps.getProperty("API_HOST");
+        apiHost = configProps.getProperty("API_HOST");
         String privateKey = configProps.getProperty("JWT_PRIVATE_KEY");
 
         HMAC256Algorithm = Algorithm.HMAC256(privateKey);
 
         accessTokenVerifier = JWT.require(HMAC256Algorithm)
                 .withIssuer("auth0")
-                .withAudience(API_HOST)
+                .withAudience(apiHost)
                 .withClaim("token_type", "access")
                 .build();
 
         refreshTokenVerifier = JWT.require(HMAC256Algorithm)
                 .withIssuer("auth0")
-                .withAudience(API_HOST)
+                .withAudience(apiHost)
                 .withClaim("token_type", "refresh")
                 .build();
     }
@@ -87,7 +87,7 @@ public class AuthTokenService {
      * @return a signed JSON Web Token
      */
     public String generateAccessToken(String userId) {
-        return generateToken("auth0", userId, API_HOST, Instant.now(), Instant.now().plus(60, ChronoUnit.MINUTES),
+        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(60, ChronoUnit.MINUTES),
                              UUID.randomUUID().toString(), null, "access", HMAC256Algorithm);
     }
 
@@ -97,7 +97,7 @@ public class AuthTokenService {
      * @return a signed JSON Web Token
      */
     public String generateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
-        return generateToken("auth0", userId, API_HOST, Instant.now(), Instant.now().plus(180, ChronoUnit.DAYS),
+        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(180, ChronoUnit.DAYS),
                              refreshTokenId, refreshTokenFamily, "refresh", HMAC256Algorithm);
     }
 

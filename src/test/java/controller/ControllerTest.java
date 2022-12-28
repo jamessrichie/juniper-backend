@@ -9,7 +9,6 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
 import org.junit.*;
 import org.junit.rules.*;
-import static org.junit.Assert.*;
 import org.apache.http.impl.client.*;
 import org.apache.http.client.methods.*;
 import org.springframework.http.HttpStatus;
@@ -30,9 +29,12 @@ public class ControllerTest {
 
     @BeforeClass
     public static void setUpBeforeClass() throws IOException {
-        // Do not swap these two lines of code or things will inexplicably break
+        // Do not swap the SpringApplication and DatabaseConnectionPool calls
+        // or things will inexplicably break
         SpringApplication.run(RestServiceApplication.class);
+
         DatabaseConnectionPool.enableTesting();
+        DatabaseConnectionPool.reducePoolSize();
 
         Properties configProps = new Properties();
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
