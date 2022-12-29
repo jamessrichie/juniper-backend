@@ -43,8 +43,8 @@ public class DatabaseConnection {
     private static final int MAX_ATTEMPTS = 16;
 
     // Account verification code expiration
-    private static final int VERIFICATION_CODE_EXPIRATION_VALUE = 20;
-    private static final ChronoUnit VERIFICATION_CODE_EXPIRATION_UNIT = ChronoUnit.SECONDS;
+    private static final int VERIFICATION_CODE_EXPIRATION_VALUE = 24;
+    private static final ChronoUnit VERIFICATION_CODE_EXPIRATION_UNIT = ChronoUnit.HOURS;
 
     // Password reset code expiration
     private static final int PASSWORD_RESET_CODE_EXPIRATION_VALUE = 15;
