@@ -2,7 +2,7 @@ package model;
 
 import java.io.*;
 import java.sql.*;
-import java.time.temporal.ChronoUnit;
+import java.time.temporal.*;
 import java.util.*;
 import java.time.*;
 import java.time.format.*;
@@ -42,6 +42,14 @@ public class DatabaseConnection {
     // Number of attempts when encountering deadlock
     private static final int MAX_ATTEMPTS = 16;
 
+    // Account verification code expiration
+    private static final int VERIFICATION_CODE_EXPIRATION_VALUE = 20;
+    private static final ChronoUnit VERIFICATION_CODE_EXPIRATION_UNIT = ChronoUnit.SECONDS;
+
+    // Password reset code expiration
+    private static final int PASSWORD_RESET_CODE_EXPIRATION_VALUE = 15;
+    private static final ChronoUnit PASSWORD_RESET_CODE_EXPIRATION_UNIT = ChronoUnit.MINUTES;
+
     // System statements
     private PreparedStatement systemTransactionCountStatement;
 
@@ -57,6 +65,7 @@ public class DatabaseConnection {
     private PreparedStatement deleteMediaStatement;
     private PreparedStatement deleteRegistrationStatement;
     private PreparedStatement deleteRelationshipStatement;
+    private PreparedStatement deleteUnverifiedUserStatement;
 
     // Update statements
     private PreparedStatement updateBiographyStatement;
@@ -163,6 +172,7 @@ public class DatabaseConnection {
         deleteMediaStatement = conn.prepareStatement(DELETE_MEDIA);
         deleteRegistrationStatement = conn.prepareStatement(DELETE_REGISTRATION);
         deleteRelationshipStatement = conn.prepareStatement(DELETE_RELATIONSHIP);
+        deleteUnverifiedUserStatement = conn.prepareStatement(DELETE_UNVERIFIED_USER);
 
         // Update statements
         updateBiographyStatement = conn.prepareStatement(UPDATE_BIOGRAPHY);
@@ -208,6 +218,7 @@ public class DatabaseConnection {
         deleteMediaStatement.close();
         deleteRegistrationStatement.close();
         deleteRelationshipStatement.close();
+        deleteUnverifiedUserStatement.close();
 
         // Update statements
         updateBiographyStatement.close();
@@ -281,6 +292,26 @@ public class DatabaseConnection {
             }
         }
         return new ResponseEntity<>(false, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Deletes a user with an unverified email
+     *
+     * @effect tbl_users (W), non-locking
+     * @return true / 200 status code iff successfully deleted user
+     */
+    public ResponseEntity<Boolean> transaction_deleteUnverifiedUser(String email) {
+        try {
+            executeUpdate(deleteUnverifiedUserStatement, email);
+            return new ResponseEntity<>(true, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(false, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
     }
 
     /**
@@ -372,8 +403,8 @@ public class DatabaseConnection {
      * Gets the verification_code for an email
      *
      * @effect tbl_users (R), non-locking
-     * @return verification_code / 200 status code if email exists and is unverified.
-     *         verification_code / 400 status code if email exists and is verified.
+     * @return verification_code / 200 status code if email exists and verification code is active.
+     *         verification_code / 400 status code if email exists and verification code is expired.
      *         null / 404 status code if email does not exist
      */
     public ResponseEntity<String> transaction_resolveEmailToVerificationCode(String email) {
@@ -385,13 +416,18 @@ public class DatabaseConnection {
                 return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
             }
 
+            // Check whether verification code is active
             String verificationCode = resolveEmailToUserRecordRS.getString("verification_code");
-            if (resolveEmailToUserRecordRS.getBoolean("verification_confirmed")) {
+            if (parseDateTimeString(resolveEmailToUserRecordRS.getString("verification_timestamp"))
+                           .isBefore(Instant.now().minus(VERIFICATION_CODE_EXPIRATION_VALUE, VERIFICATION_CODE_EXPIRATION_UNIT))) {
+
                 resolveEmailToUserRecordRS.close();
                 return new ResponseEntity<>(verificationCode, HttpStatus.BAD_REQUEST);
+
+            } else {
+                resolveEmailToUserRecordRS.close();
+                return new ResponseEntity<>(verificationCode, HttpStatus.OK);
             }
-            resolveEmailToUserRecordRS.close();
-            return new ResponseEntity<>(verificationCode, HttpStatus.OK);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -516,9 +552,7 @@ public class DatabaseConnection {
 
                 // Checks whether verification code exists, has not expired, and has not been used
                 ResultSet resolveVerificationCodeToUserRecordRS = executeQuery(resolveVerificationCodeToUserRecordStatement, verificationCode);
-                if (!resolveVerificationCodeToUserRecordRS.next() ||
-                    parseDateTimeString(resolveVerificationCodeToUserRecordRS.getString("verification_timestamp"))
-                        .isBefore(Instant.now().minus(24, ChronoUnit.HOURS))) {
+                if (!resolveVerificationCodeToUserRecordRS.next()) {
                     resolveVerificationCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -528,6 +562,12 @@ public class DatabaseConnection {
 
                     rollbackTransaction();
                     return new ResponseEntity<>(true, HttpStatus.BAD_REQUEST);
+                } else if (parseDateTimeString(resolveVerificationCodeToUserRecordRS.getString("verification_timestamp"))
+                           .isBefore(Instant.now().minus(VERIFICATION_CODE_EXPIRATION_VALUE, VERIFICATION_CODE_EXPIRATION_UNIT))) {
+                    resolveVerificationCodeToUserRecordRS.close();
+
+                    rollbackTransaction();
+                    return new ResponseEntity<>(false, HttpStatus.NOT_FOUND);
                 }
 
                 resolveVerificationCodeToUserRecordRS.close();
@@ -564,7 +604,7 @@ public class DatabaseConnection {
             ResultSet checkVerificationCodeUsedRS = executeQuery(resolvePasswordResetCodeToUserRecord, passwordResetCode);
             if (!checkVerificationCodeUsedRS.next() || checkVerificationCodeUsedRS.getString("password_reset_code") == null ||
                 parseDateTimeString(checkVerificationCodeUsedRS.getString("password_reset_timestamp"))
-                        .isBefore(Instant.now().minus(15, ChronoUnit.MINUTES))) {
+                        .isBefore(Instant.now().minus(PASSWORD_RESET_CODE_EXPIRATION_VALUE, PASSWORD_RESET_CODE_EXPIRATION_UNIT))) {
                 checkVerificationCodeUsedRS.close();
                 return new ResponseEntity<>(false, HttpStatus.UNAUTHORIZED);
             }
@@ -596,7 +636,7 @@ public class DatabaseConnection {
                         passwordResetCode);
                 if (!resolvePasswordResetCodeToUserRecordRS.next() || resolvePasswordResetCodeToUserRecordRS.getString("password_reset_code") == null ||
                     parseDateTimeString(resolvePasswordResetCodeToUserRecordRS.getString("password_reset_timestamp"))
-                        .isBefore(Instant.now().minus(15, ChronoUnit.MINUTES))) {
+                        .isBefore(Instant.now().minus(PASSWORD_RESET_CODE_EXPIRATION_VALUE, PASSWORD_RESET_CODE_EXPIRATION_UNIT))) {
                     resolvePasswordResetCodeToUserRecordRS.close();
 
                     rollbackTransaction();
@@ -1487,7 +1527,7 @@ public class DatabaseConnection {
      * @return Instant object representing UTC time
      */
     private Instant parseDateTimeString(String dateTime) {
-        return LocalDateTime.parse(dateTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
+        return LocalDateTime.parse(dateTime.substring(0, 19), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                                                               .atZone(ZoneId.of("UTC"))
                                                               .toInstant();
     }

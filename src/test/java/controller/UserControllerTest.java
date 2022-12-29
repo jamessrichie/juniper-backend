@@ -94,9 +94,9 @@ public final class UserControllerTest extends ControllerTest {
 
             // Check that account is verified in database
             dbconn = DatabaseConnectionPool.getConnection();
-            resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode("name@email.com");
+            ResponseEntity<Boolean> checkEmailVerifiedStatus = dbconn.transaction_checkEmailVerified("name@email.com");
             dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
-            assertEquals(HttpStatus.BAD_REQUEST, resolveEmailToVerificationCodeStatus.getStatusCode());
+            assertEquals(Boolean.TRUE, checkEmailVerifiedStatus.getBody());
 
             // Request account verification email
             postResponse = sendPostRequest("/user/request-account-verification", body);
@@ -144,9 +144,9 @@ public final class UserControllerTest extends ControllerTest {
 
             // Check that account is verified in database
             dbconn = DatabaseConnectionPool.getConnection();
-            resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode("name@email.com");
+            ResponseEntity<Boolean> checkEmailVerifiedStatus = dbconn.transaction_checkEmailVerified("name@email.com");
             dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
-            assertEquals(HttpStatus.BAD_REQUEST, resolveEmailToVerificationCodeStatus.getStatusCode());
+            assertEquals(Boolean.TRUE, checkEmailVerifiedStatus.getBody());
 
             // Check appropriate response for request to verify a verified account
             getResponse = sendGetRequest("/user/verify-account", parameters);

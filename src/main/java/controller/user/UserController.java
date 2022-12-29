@@ -30,6 +30,12 @@ public class UserController {
 
     /**
      * Creates a new user account
+     * <ul>
+     *     <li> If email does not exist, then create user account </li>
+     *     <li> If email exists and verification code is active, then send password reset code </li>
+     *     <li> If email exists, verification code has expired, and user is verified, then send password reset code </li>
+     *     <li> If email exists, verification code has expired, and user is unverified, then delete old user account and create user account </li>
+     * </ul>
      *
      * @param payload JSON object containing "name", "email", "password" fields
      * @apiNote POST request
@@ -49,28 +55,38 @@ public class UserController {
             String email = payload.get("email").toLowerCase();
             String password = payload.get("password");
 
-            // Check that the email is not in use
-            ResponseEntity<String> resolveEmailToUserIdStatus = dbconn.transaction_resolveEmailToUserId(email);
+            // Gets the verification code for the user and identifies whether the verification code is active
+            ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
 
-            // TODO: if email is in use and account is unverified, delete old account and send confirmation email. if email is in use and account is verified, then send reset email
-            // If email is in use, then send a reset password link
-            if (resolveEmailToUserIdStatus.getStatusCode() == HttpStatus.OK) {
+            // Checks whether the user is verified
+            ResponseEntity<Boolean> checkEmailVerifiedStatus = dbconn.transaction_checkEmailVerified(email);
 
-                // Generates a password reset code for the user
+            if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.OK ||
+                resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST && Boolean.TRUE.equals(checkEmailVerifiedStatus.getBody())) {
+                // If (email exists and verification code is active) or (email exists, verification code has expired, and user is verified),
+                // then send password reset code
                 ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_generatePasswordResetCode(email);
                 if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
-                    return createStatusJSON("Successfully sent email", HttpStatus.OK);
+                    // If could not generate a password reset code for the user, then return internal server error
+                    return createStatusJSON("Failed to create user", HttpStatus.INTERNAL_SERVER_ERROR);
                 }
                 String passwordResetCode = resolveEmailToPasswordResetCodeStatus.getBody();
 
                 // On success, send verification email
                 return mailService.sendPasswordResetEmail(name, email, passwordResetCode);
-            }
 
+            } else if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST && Boolean.FALSE.equals(checkEmailVerifiedStatus.getBody())) {
+                // If email exists, verification code has expired, and user is unverified, then delete old user account
+                ResponseEntity<Boolean> deleteUnverifiedUserStatus = dbconn.transaction_deleteUnverifiedUser(email);
+                if (deleteUnverifiedUserStatus.getStatusCode() != HttpStatus.OK) {
+                    // If could not delete user, then return internal server error
+                    return createStatusJSON("Failed to create user", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+            // Creates user account
             String userHandle = generateUserHandle(dbconn, name);
             String verificationCode = generateSecureString(64);
 
-            // Creates the user
             ResponseEntity<Boolean> createUserStatus = dbconn.transaction_createUser(userHandle, name, email, password, verificationCode);
             if (createUserStatus.getStatusCode() != HttpStatus.OK) {
                 return createStatusJSON("Failed to create user", createUserStatus.getStatusCode());
@@ -84,7 +100,14 @@ public class UserController {
     }
 
     /**
-     * Sends an account verification email
+     * Sends an account verification email.
+     * <ul>
+     *     <li> If email does not exist, then return email sent message </li>
+     *     <li> If email exists and verification code is active, then send verification email </li>
+     *     <li> If email exists, verification code has expired, and user is verified, then send verification email </li>
+     *     <li> If email exists, verification code has expired, and user is unverified, then delete old user account and
+     *          return verification code expired message </li>
+     * </ul>
      *
      * @param payload JSON object containing "email" field
      * @apiNote POST request
@@ -102,25 +125,34 @@ public class UserController {
 		try {
             String email = payload.get("email").toLowerCase();
 
-            // Gets the name of the user
-            ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
-            if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
-                // If user does not exist, vaguely claim that email has been sent
-                return createStatusJSON("Successfully sent email", HttpStatus.OK);
-            }
-            String name = resolveEmailToUserNameStatus.getBody();
-
-            // Gets the verification code for the user
+            // Gets the verification code for the user and identifies whether the verification code is active
             ResponseEntity<String> resolveEmailToVerificationCodeStatus = dbconn.transaction_resolveEmailToVerificationCode(email);
-            if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.OK ||
-                resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST) {
+            String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
 
-                // If account exists, send verification email
-                String verificationCode = resolveEmailToVerificationCodeStatus.getBody();
+            // Checks whether the user is verified
+            ResponseEntity<Boolean> checkEmailVerifiedStatus = dbconn.transaction_checkEmailVerified(email);
+
+            if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.OK ||
+                resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST && Boolean.TRUE.equals(checkEmailVerifiedStatus.getBody())) {
+                // If (email exists and verification code is active) or (email exists, verification code has expired, and user is verified),
+                // then send verification email
+                ResponseEntity<String> resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName(email);
+                if (resolveEmailToUserNameStatus.getStatusCode() != HttpStatus.OK) {
+                    // If could not find a name for the user, then return internal server error
+                    return createStatusJSON("Failed to send email", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+                String name = resolveEmailToUserNameStatus.getBody();
+
                 return mailService.sendVerificationEmail(name, email, verificationCode);
 
+            } else if (resolveEmailToVerificationCodeStatus.getStatusCode() == HttpStatus.BAD_REQUEST && Boolean.FALSE.equals(checkEmailVerifiedStatus.getBody())) {
+                // If email exists, verification code has expired, and user is unverified, then delete old user account
+                ResponseEntity<Boolean> deleteUnverifiedUserStatus = dbconn.transaction_deleteUnverifiedUser(email);
+                return createStatusJSON("Verification code has expired. Please create a new account", HttpStatus.OK);
+
             } else {
-                return createStatusJSON("Failed to send email", resolveEmailToVerificationCodeStatus.getStatusCode());
+                // If email does not exist, then return email sent message
+                return createStatusJSON("Successfully sent email", HttpStatus.OK);
             }
 
         } finally {
@@ -130,6 +162,12 @@ public class UserController {
 
     /**
      * Verifies the user's email and redirects them to a status page
+     * <ul>
+     *     <li> If email does not exist, then return verification code expired page </li>
+     *     <li> If email exists and user is verified, then return account already verified page </li>
+     *     <li> If email exists, user is not verified, and verification code has expired, then return verification code expired page </li>
+     *     <li> If email exists, user is not verified, and verification code is active, then return verification success page </li>
+     * </ul>
      *
      * @apiNote GET request
      * @return HTML page. 200 status code iff success

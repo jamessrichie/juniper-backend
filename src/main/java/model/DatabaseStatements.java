@@ -43,6 +43,11 @@ public final class DatabaseStatements {
                                                      "WHERE user_id = ? " +
                                                      "AND other_user_id = ?";
 
+    // Removes an unverified user
+    public static final String DELETE_UNVERIFIED_USER = "DELETE FROM tbl_users " +
+                                                        "WHERE email = ? " +
+                                                        "AND verification_confirmed = 0";
+
     // Sets a user's biography field
     public static final String UPDATE_BIOGRAPHY = "UPDATE tbl_users " +
                                                   "SET biography = ? " +

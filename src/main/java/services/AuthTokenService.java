@@ -7,6 +7,7 @@ import java.time.temporal.*;
 
 import com.auth0.jwt.*;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
@@ -29,6 +30,14 @@ public class AuthTokenService {
     private final Algorithm HMAC256Algorithm;
     private final JWTVerifier accessTokenVerifier;
     private final JWTVerifier refreshTokenVerifier;
+
+    // Access token expiration
+    private static final int ACCESS_TOKEN_EXPIRATION_VALUE = 60;
+    private static final ChronoUnit ACCESS_TOKEN_EXPIRATION_UNIT = ChronoUnit.MINUTES;
+
+    // Refresh token expiration
+    private static final int REFRESH_TOKEN_EXPIRATION_VALUE = 180;
+    private static final ChronoUnit REFRESH_TOKEN_EXPIRATION_UNIT = ChronoUnit.DAYS;
 
     /**
      * Creates a new AuthTokenService instance
@@ -87,7 +96,7 @@ public class AuthTokenService {
      * @return a signed JSON Web Token
      */
     public String generateAccessToken(String userId) {
-        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(60, ChronoUnit.MINUTES),
+        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(ACCESS_TOKEN_EXPIRATION_VALUE, ACCESS_TOKEN_EXPIRATION_UNIT),
                              UUID.randomUUID().toString(), null, "access", HMAC256Algorithm);
     }
 
@@ -97,7 +106,7 @@ public class AuthTokenService {
      * @return a signed JSON Web Token
      */
     public String generateRefreshToken(String userId, String refreshTokenId, String refreshTokenFamily) {
-        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(180, ChronoUnit.DAYS),
+        return generateToken("auth0", userId, apiHost, Instant.now(), Instant.now().plus(REFRESH_TOKEN_EXPIRATION_VALUE, REFRESH_TOKEN_EXPIRATION_UNIT),
                              refreshTokenId, refreshTokenFamily, "refresh", HMAC256Algorithm);
     }
 
@@ -145,7 +154,7 @@ public class AuthTokenService {
             assert(decodedToken.getExpiresAtAsInstant().isAfter(Instant.now()));
             return true;
 
-        } catch (AssertionError e){
+        } catch (AssertionError | JWTDecodeException e){
             return false;
 
         } catch (Exception e) {
@@ -186,7 +195,7 @@ public class AuthTokenService {
                 // If refresh token is invalid but does not belong to current token family, then deny access
                 return null;
             }
-        } catch (AssertionError e) {
+        } catch (AssertionError | JWTDecodeException e) {
             return null;
 
         } catch (Exception e) {
