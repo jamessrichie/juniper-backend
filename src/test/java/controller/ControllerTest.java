@@ -5,18 +5,14 @@ import java.sql.*;
 import java.util.*;
 
 import com.google.gson.*;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.util.EntityUtils;
 import org.junit.*;
 import org.junit.rules.*;
 import static org.junit.Assert.*;
-import org.apache.http.impl.client.*;
-import org.apache.http.client.methods.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.ResourceUtils;
 
 import model.*;
+import static helpers.Utilities.*;
 
 public class ControllerTest {
 
@@ -24,8 +20,6 @@ public class ControllerTest {
     public final Timeout globalTimeout = Timeout.seconds(30);
 
     private Savepoint savepoint;
-    private static String apiHost;
-    private static CloseableHttpClient httpClient;
 
     @BeforeClass
     public static void setUpBeforeClass() throws IOException {
@@ -35,19 +29,11 @@ public class ControllerTest {
 
         DatabaseConnectionPool.enableTesting();
         DatabaseConnectionPool.reducePoolSize();
-
-        Properties configProps = new Properties();
-        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
-
-        apiHost = configProps.getProperty("API_HOST");
-
-        httpClient = HttpClients.createDefault();
     }
 
     @AfterClass
-    public static void tearDownAfterClass() throws IOException {
+    public static void tearDownAfterClass() {
         DatabaseConnectionPool.disableTesting();
-        httpClient.close();
     }
 
     @Before
@@ -64,39 +50,6 @@ public class ControllerTest {
         DatabaseConnectionPool.releaseConnection(dbconn);
     }
 
-    protected static ResponseEntity<String> sendGetRequest(String apiPathUrl, Map<String, String> parameters) throws IOException {
-        StringJoiner sj = new StringJoiner("&", apiHost + apiPathUrl + "?", "");
-        for (String key : parameters.keySet()) {
-            sj.add(key + "=" + parameters.get(key));
-        }
-        String url = sj.toString();
-        System.out.println(url);
-        HttpGet get = new HttpGet(url);
-
-        CloseableHttpResponse response = httpClient.execute(get);
-
-        String responseBody = EntityUtils.toString(response.getEntity(), "UTF-8");
-        HttpStatus statusCode = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
-
-        return new ResponseEntity<>(responseBody, statusCode);
-    }
-
-    protected static ResponseEntity<JsonObject> sendPostRequest(String apiPathUrl, Map<String, Object> body) throws IOException {
-        HttpPost post = new HttpPost(apiHost + apiPathUrl);
-        StringEntity entity = new StringEntity(new Gson().toJson(body));
-        post.setEntity(entity);
-        post.setHeader("Accept", "application/json");
-        post.setHeader("Content-type", "application/json");
-
-        CloseableHttpResponse response = httpClient.execute(post);
-
-        JsonObject responseBody = new JsonParser().parse(EntityUtils.toString(response.getEntity(), "UTF-8"))
-                .getAsJsonObject();
-        HttpStatus statusCode = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
-
-        return new ResponseEntity<>(responseBody, statusCode);
-    }
-
     protected static Map<String, String> generateParameters(Object... args) {
         return (Map<String, String>) (Map) generateBody(args);
     }
@@ -108,20 +61,6 @@ public class ControllerTest {
             map.put(args[i].toString(), args[i + 1]);
         }
         return map;
-    }
-    
-    /**
-     * Extracts a value from a JSON object given its key
-     */
-    protected Object extractValueFromJsonObject(JsonObject json, String key) {
-        return json.get(key);
-    }
-
-    /**
-     * Extracts a string from a JSON object given its key
-     */
-    protected String extractStringFromJsonObject(JsonObject json, String key) {
-        return extractValueFromJsonObject(json, key).toString().replaceAll("\"", "");
     }
 
     /**

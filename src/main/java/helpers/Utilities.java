@@ -1,15 +1,23 @@
 package helpers;
 
-import java.security.NoSuchAlgorithmException;
+import java.io.*;
 import java.util.*;
 import java.security.SecureRandom;
 
+import com.google.gson.*;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.*;
+import org.apache.http.util.EntityUtils;
 import org.jsoup.Jsoup;
+import org.apache.http.client.methods.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ResourceUtils;
 
+
 public final class Utilities {
+
+    private static final CloseableHttpClient httpClient = HttpClients.createDefault();
 
     /**
      * Loads an HTML template from resources/templates
@@ -71,6 +79,62 @@ public final class Utilities {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
 
+    public static ResponseEntity<String> sendGetRequest(String apiPathUrl, Map<String, String> parameters) throws IOException {
+        Properties configProps = new Properties();
+        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
+
+        String apiHost = configProps.getProperty("API_HOST");
+
+        StringJoiner sj = new StringJoiner("&", apiHost + apiPathUrl + "?", "");
+        for (String key : parameters.keySet()) {
+            sj.add(key + "=" + parameters.get(key));
+        }
+        String url = sj.toString();
+        System.out.println(url);
+        HttpGet get = new HttpGet(url);
+
+        CloseableHttpResponse response = httpClient.execute(get);
+
+        String responseBody = EntityUtils.toString(response.getEntity(), "UTF-8");
+        HttpStatus statusCode = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
+
+        return new ResponseEntity<>(responseBody, statusCode);
+    }
+
+    public static ResponseEntity<JsonObject> sendPostRequest(String apiPathUrl, Map<String, Object> body) throws IOException {
+        Properties configProps = new Properties();
+        configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
+
+        String apiHost = configProps.getProperty("API_HOST");
+
+        HttpPost post = new HttpPost(apiHost + apiPathUrl);
+        StringEntity entity = new StringEntity(new Gson().toJson(body));
+        post.setEntity(entity);
+        post.setHeader("Accept", "application/json");
+        post.setHeader("Content-type", "application/json");
+
+        CloseableHttpResponse response = httpClient.execute(post);
+
+        JsonObject responseBody = new JsonParser().parse(EntityUtils.toString(response.getEntity(), "UTF-8"))
+                .getAsJsonObject();
+        HttpStatus statusCode = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
+
+        return new ResponseEntity<>(responseBody, statusCode);
+    }
+
+    /**
+     * Extracts a value from a JSON object given its key
+     */
+    public static Object extractValueFromJsonObject(JsonObject json, String key) {
+        return json.get(key);
+    }
+
+    /**
+     * Extracts a string from a JSON object given its key
+     */
+    public static String extractStringFromJsonObject(JsonObject json, String key) {
+        return extractValueFromJsonObject(json, key).toString().replaceAll("\"", "");
     }
 }

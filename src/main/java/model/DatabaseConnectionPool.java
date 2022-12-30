@@ -23,6 +23,9 @@ public class DatabaseConnectionPool {
     private static final BlockingQueue<DatabaseConnection> idleConnections;
     private static final BlockingQueue<DatabaseConnection> activeConnections;
 
+    // getConnection timeout
+    private static final int TIMEOUT_VALUE = 30;
+    private static final TimeUnit TIMEOUT_UNIT = TimeUnit.SECONDS;
 
     static {
         try {
@@ -46,8 +49,8 @@ public class DatabaseConnectionPool {
         lock.lock();
 
         try {
-            // if there are no idle connections and pool size is below max, then create new connection
             if (idleConnections.size() == 0 && size() < maxPoolSize) {
+                // If there are no idle connections and pool size is below max, then create new connection
                 try {
                     DatabaseConnection dbconn = new DatabaseConnection();
                     activeConnections.put(dbconn);
@@ -55,9 +58,12 @@ public class DatabaseConnectionPool {
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-                // otherwise wait for idle connection
             } else {
-                DatabaseConnection dbconn = idleConnections.take();
+                // Otherwise wait for idle connection
+                DatabaseConnection dbconn = idleConnections.poll(TIMEOUT_VALUE, TIMEOUT_UNIT);
+                if (dbconn == null) {
+                    throw new RuntimeException("DatabaseConnection deadlock");
+                }
                 activeConnections.put(dbconn);
 
                 return dbconn;

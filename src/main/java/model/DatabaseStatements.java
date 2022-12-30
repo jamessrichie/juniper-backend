@@ -28,7 +28,7 @@ public final class DatabaseStatements {
     // Creates a user record
     public static final String CREATE_USER = "INSERT INTO tbl_users " +
                                              "VALUES (NEWID(), ?, ?, ?, ?, ?, null, null, ?, GETUTCDATE(), 0," +
-                                             "null, null, 0, null, null, null, null, null, null, null, null)";
+                                             "null, null, 'verification', 0, null, null, null, null, null, null, null, null)";
 
     // Removes a user's media
     public static final String DELETE_MEDIA = "DELETE FROM tbl_media " +
@@ -77,7 +77,8 @@ public final class DatabaseStatements {
     // Set's a user's password_reset_code, password_reset_timestamp fields
     public static final String UPDATE_PASSWORD_RESET_CODE = "UPDATE tbl_users " +
                                                             "SET password_reset_code = ?, " +
-                                                            "password_reset_timestamp = GETUTCDATE() " +
+                                                            "password_reset_timestamp = GETUTCDATE()," +
+                                                            "most_recent_email_type = 'password_reset'" +
                                                             "WHERE email = ?";
 
     // Sets a user's user_handle, user_name, email, date_of_birth, city, state, and country fields

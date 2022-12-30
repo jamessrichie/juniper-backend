@@ -214,7 +214,7 @@ public class AuthController {
             // Gets the password reset code for the user
             ResponseEntity<String> resolveEmailToPasswordResetCodeStatus = dbconn.transaction_generatePasswordResetCode(email);
             if (resolveEmailToPasswordResetCodeStatus.getStatusCode() != HttpStatus.OK) {
-                return createStatusJSON("Failed to request password reset", HttpStatus.INTERNAL_SERVER_ERROR);
+                return createStatusJSON("Request failed", HttpStatus.INTERNAL_SERVER_ERROR);
             }
             String passwordResetCode = resolveEmailToPasswordResetCodeStatus.getBody();
 

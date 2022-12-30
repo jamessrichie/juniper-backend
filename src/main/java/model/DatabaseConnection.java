@@ -379,7 +379,7 @@ public class DatabaseConnection {
      */
     public ResponseEntity<String> transaction_resolveEmailToUserId(String email) {
         try {
-            // Retrieves the user name that the email is mapped to
+            // Retrieves the name that the email is mapped to
             ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
             if (!resolveEmailToUserRecordRS.next()) {
                 resolveEmailToUserRecordRS.close();
@@ -389,6 +389,35 @@ public class DatabaseConnection {
             resolveEmailToUserRecordRS.close();
 
             return new ResponseEntity<>(userId, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
+    }
+
+    /**
+     * Gets the most recent email type for an email. <br>
+     * This is the type of the most recent email sent to the user
+     *
+     * @effect tbl_users (R), non-locking
+     * @return user_id / 200 status code if email exists. otherwise, return null
+     */
+    public ResponseEntity<String> transaction_resolveEmailToMostRecentEmailType(String email) {
+        try {
+            // Retrieves the most recent email type that the email is mapped to
+            ResultSet resolveEmailToUserRecordRS = executeQuery(resolveEmailToUserRecordStatement, email);
+            if (!resolveEmailToUserRecordRS.next()) {
+                resolveEmailToUserRecordRS.close();
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            }
+            String mostRecentEmailType = resolveEmailToUserRecordRS.getString("most_recent_email_type");
+            resolveEmailToUserRecordRS.close();
+
+            return new ResponseEntity<>(mostRecentEmailType, HttpStatus.OK);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -515,7 +544,7 @@ public class DatabaseConnection {
      * Checks whether the user's email has been verified
      *
      * @effect tbl_users (R), non-locking
-     * @return true / 200 status code iff email has been verified
+     * @return true iff email has been verified. 200 status code if email corresponds to a user
      */
     public ResponseEntity<Boolean> transaction_checkEmailVerified(String email) {
         try {
@@ -527,7 +556,7 @@ public class DatabaseConnection {
             } else if (resolveEmailToUserRecordRS.getBoolean("verification_confirmed")) {
                 return new ResponseEntity<>(true, HttpStatus.OK);
             } else {
-                return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(false, HttpStatus.OK);
             }
 
         } catch (Exception e) {

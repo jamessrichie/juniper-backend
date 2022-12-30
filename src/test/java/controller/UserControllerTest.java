@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 
 import model.*;
 import types.*;
+import static helpers.Utilities.*;
 
 public final class UserControllerTest extends ControllerTest {
 
@@ -45,14 +46,40 @@ public final class UserControllerTest extends ControllerTest {
             assertEquals(HttpStatus.OK, postResponse.getStatusCode());
             assertEquals("Successfully sent email", extractStringFromJsonObject(postResponse.getBody(), "status"));
 
-            // Check that user1 is unchanged in database
+            // Check that user1 has been replaced by user2 in database
             dbconn = DatabaseConnectionPool.getConnection();
             resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName("name1@email.com");
-            assertEquals("name1", resolveEmailToUserNameStatus.getBody());
+            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
+            assertEquals("name2", resolveEmailToUserNameStatus.getBody());
+
+            // Check that password reset code has not been generated
+            dbconn = DatabaseConnectionPool.getConnection();
+            ResponseEntity<String> resolveEmailToPasswordResetCode = dbconn.transaction_resolveEmailToPasswordResetCode("name1@email.com");
+            assertEquals(null, resolveEmailToPasswordResetCode.getBody());
+            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
+
+            verifyUser("name1@email.com");
+
+            // Create user3 with duplicate email
+            body = generateBody("name", "name3",
+                                "email", "name1@email.com",
+                                "password", "password3");
+            postResponse = sendPostRequest("/user/create", body);
+
+            // Check that request to create user3 is successful
+            assertEquals(HttpStatus.OK, postResponse.getStatusCode());
+            assertEquals("Successfully sent email", extractStringFromJsonObject(postResponse.getBody(), "status"));
+
+            // Check that user2 has not been changed in database
+            dbconn = DatabaseConnectionPool.getConnection();
+            resolveEmailToUserNameStatus = dbconn.transaction_resolveEmailToUserName("name1@email.com");
+            dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
+            assertEquals("name2", resolveEmailToUserNameStatus.getBody());
 
             // Check that password reset code has been generated
-            ResponseEntity<String> resolveEmailToPasswordResetCode = dbconn.transaction_resolveEmailToPasswordResetCode("name1@email.com");
-            assertEquals(HttpStatus.OK, resolveEmailToPasswordResetCode.getStatusCode());
+            dbconn = DatabaseConnectionPool.getConnection();
+            resolveEmailToPasswordResetCode = dbconn.transaction_resolveEmailToPasswordResetCode("name1@email.com");
+            assertNotNull(resolveEmailToPasswordResetCode.getBody());
             dbconn = DatabaseConnectionPool.releaseConnection(dbconn);
 
         } catch (IOException e) {
