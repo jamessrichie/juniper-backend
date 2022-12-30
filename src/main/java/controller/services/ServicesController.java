@@ -35,7 +35,8 @@ public class ServicesController {
             String redirectUrl;
 
             if (mostRecentEmailType == null) {
-                return createStatusJSON("Request failed", HttpStatus.INTERNAL_SERVER_ERROR);
+                // If user does not exist, vaguely claim that email has been sent
+                return createStatusJSON("Successfully sent email", HttpStatus.OK);
 
             } else if (mostRecentEmailType.equals("verification")) {
                 redirectUrl = "/user/request-account-verification";

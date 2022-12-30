@@ -124,7 +124,7 @@ public class UserController {
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
     public ResponseEntity<Object> sendAccountVerificationEmail(@RequestBody Map<String, String> payload) {
-        
+
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
