@@ -210,6 +210,37 @@ public class UserController {
     }
 
     /**
+     * Checks whether the user's profile is completed
+     *
+     * @param payload JSON object containing "userId", "accessToken" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/check-profile-completed",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> checkProfileCompleted(@RequestBody Map<String, String> payload) {
+        DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
+
+        try {
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            return createStatusJSON(dbconn.transaction_resolveEmailToProfileCompleted(userId));
+
+        } finally {
+            DatabaseConnectionPool.releaseConnection(dbconn);
+        }
+    }
+
+    /**
      * Updates the user's personal information
      *
      * @param payload JSON object containing "userId", "accessToken", "userHandle", "name", "email", "dateOfBirth" fields
@@ -241,6 +272,7 @@ public class UserController {
             String dateOfBirth = payload.get("dateOfBirth");
 
             return createStatusJSON(dbconn.transaction_updatePersonalInformation(userId, userHandle, name, email, dateOfBirth));
+
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
         }

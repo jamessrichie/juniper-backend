@@ -429,6 +429,34 @@ public class DatabaseConnection {
     }
 
     /**
+     * Gets the profile_completed value for an email
+     *
+     * @effect tbl_users (R), non-locking
+     * @return profile_completed / 200 status code if email exists. otherwise, return null
+     */
+    public ResponseEntity<Boolean> transaction_resolveEmailToProfileCompleted(String email) {
+        try {
+            // Retrieves the most recent email type that the email is mapped to
+            ResultSet resolveUserIdToUserRecordRS = executeQuery(resolveUserIdToUserRecordStatement, email);
+            if (!resolveUserIdToUserRecordRS.next()) {
+                resolveUserIdToUserRecordRS.close();
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            }
+            Boolean profileCompleted = resolveUserIdToUserRecordRS.getBoolean("profile_completed");
+            resolveUserIdToUserRecordRS.close();
+
+            return new ResponseEntity<>(profileCompleted, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        } finally {
+            checkDanglingTransaction();
+        }
+    }
+
+    /**
      * Gets the verification_code for an email
      *
      * @effect tbl_users (R), non-locking

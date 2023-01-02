@@ -66,7 +66,7 @@ public class AuthTokenService {
     }
 
     /**
-     * Generates a refresh token valid for 6 months
+     * Generates a token
      *
      * @return a signed JSON Web Token
      */
@@ -138,7 +138,7 @@ public class AuthTokenService {
         if (updateRefreshTokenStatus.getStatusCode() != HttpStatus.OK) {
             return null;
         }
-        return new AuthTokens(accessToken, refreshToken);
+        return new AuthTokens(userId, accessToken, refreshToken);
     }
 
     /**

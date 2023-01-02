@@ -277,7 +277,6 @@ public class AuthController {
     public ResponseEntity<String> resetPassword(@RequestParam(value = "code") String passwordResetCode,
                                                 @RequestParam(value = "password") String password) {
 
-        System.out.println("processResetCode");
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
