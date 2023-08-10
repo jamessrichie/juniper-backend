@@ -1430,7 +1430,7 @@ public class DatabaseConnection {
             systemTransactionCountRS.next();
 
             return systemTransactionCountRS.getInt("transaction_count");
-        } catch (Exception e) {
+        } catch (SQLException e) {
             throw new IllegalStateException("Database error", e);
         }
     }
