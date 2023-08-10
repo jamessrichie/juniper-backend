@@ -42,6 +42,8 @@ public class DatabaseConnectionPool {
 
     /**
      * Gets a connection from the connection pool
+     * TODO: optimize check for broken pipe / closed connection such that
+     *       it only checks if connection hasn't been used in a while
      *
      * @return a DatabaseConnection object
      */
@@ -64,11 +66,17 @@ public class DatabaseConnectionPool {
                 if (dbconn == null) {
                     throw new RuntimeException("DatabaseConnection deadlock");
                 }
-                activeConnections.put(dbconn);
 
+                // If idle connection has closed, then create new connection
+                try {
+                    dbconn.getTransactionCount();
+                } catch (Exception e) {
+                    dbconn = new DatabaseConnection();
+                }
+                activeConnections.put(dbconn);
                 return dbconn;
             }
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
 
         } finally {

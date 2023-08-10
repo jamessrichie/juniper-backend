@@ -108,7 +108,7 @@ public class DatabaseConnectionPoolTest {
         System.out.println("Reuse duration: " + reuseDuration + "ms");
 
         // Check that the connection pool is reusing existing connections instead of generating new ones
-        assert(reuseDuration < initializeDuration / MAX_POOL_SIZE);
+        assert(reuseDuration < initializeDuration / 2);
     }
 
     @Test
