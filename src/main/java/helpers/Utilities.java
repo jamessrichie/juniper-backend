@@ -85,9 +85,9 @@ public final class Utilities {
         Properties configProps = new Properties();
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
 
-        String apiHost = configProps.getProperty("API_HOST");
+        String localHost = configProps.getProperty("LOCAL_HOST");
 
-        StringJoiner sj = new StringJoiner("&", apiHost + apiPathUrl + "?", "");
+        StringJoiner sj = new StringJoiner("&", localHost + apiPathUrl + "?", "");
         for (String key : parameters.keySet()) {
             sj.add(key + "=" + parameters.get(key));
         }
@@ -107,9 +107,9 @@ public final class Utilities {
         Properties configProps = new Properties();
         configProps.load(new FileInputStream(ResourceUtils.getFile("classpath:properties/api.properties")));
 
-        String apiHost = configProps.getProperty("API_HOST");
+        String localHost = configProps.getProperty("LOCAL_HOST");
 
-        HttpPost post = new HttpPost(apiHost + apiPathUrl);
+        HttpPost post = new HttpPost(localHost + apiPathUrl);
         StringEntity entity = new StringEntity(new Gson().toJson(body));
         post.setEntity(entity);
         post.setHeader("Accept", "application/json");
