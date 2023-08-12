@@ -7,7 +7,7 @@ import com.google.gson.JsonObject;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
-import model.*;
+import model.database.*;
 import static helpers.Utilities.*;
 
 @RestController

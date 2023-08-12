@@ -6,8 +6,8 @@ import java.util.*;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
-import model.*;
 import services.*;
+import model.database.*;
 import static helpers.Utilities.*;
 
 @RestController

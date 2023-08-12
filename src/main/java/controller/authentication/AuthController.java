@@ -7,10 +7,10 @@ import org.springframework.http.*;
 import org.springframework.util.*;
 import org.springframework.web.bind.annotation.*;
 
-import model.*;
+import model.database.*;
+import types.AuthTokens;
 import services.AuthTokenService;
 import services.MailService;
-import types.AuthTokens;
 import static helpers.Utilities.*;
 
 @RestController

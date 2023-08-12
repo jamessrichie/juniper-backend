@@ -1,14 +1,15 @@
 package controller;
 
-import model.DatabaseConnectionPool;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.util.ResourceUtils;
-
 import java.io.*;
 import java.util.*;
 import java.time.*;
 import java.time.format.*;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.util.ResourceUtils;
+
+import model.database.DatabaseConnectionPool;
 
 @SpringBootApplication
 public class RestServiceApplication {

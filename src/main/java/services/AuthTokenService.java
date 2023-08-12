@@ -12,8 +12,8 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.http.*;
 import org.springframework.util.ResourceUtils;
 
-import model.*;
 import types.AuthTokens;
+import model.database.DatabaseConnection;
 
 /**
  * Consult section 1.5 of the following standard for further details <br>

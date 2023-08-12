@@ -3,10 +3,13 @@ package controller.user;
 import java.io.*;
 import java.util.*;
 
+import com.azure.storage.blob.BlobContainerClient;
+import model.database.DatabaseConnection;
+import model.database.DatabaseConnectionPool;
+import model.storage.StorageConnection;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
-import model.*;
 import services.*;
 import static helpers.Utilities.*;
 
@@ -465,7 +468,41 @@ public class UserController {
         produces = MediaType.APPLICATION_JSON_VALUE,
         method = RequestMethod.POST)
     public ResponseEntity<Object> updateProfilePicture(@RequestBody Map<String, String> payload) {
+        try {
+            StorageConnection stconn = new StorageConnection();
 
+            String userId = payload.get("userId");
+            String accessToken = payload.get("accessToken");
+            String profilePicture = payload.get("profilePicture");
+
+            // Verifies access token
+            if (!authTokenService.verifyAccessToken(userId, accessToken)) {
+                return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
+            }
+
+            BlobContainerClient containerClient = stconn.storage_createContainer(userId.toLowerCase());
+            stconn.storage_uploadBlob(containerClient, "profile-picture", profilePicture);
+
+            return createStatusJSON("Successfully updated profile picture", HttpStatus.OK);
+
+        } catch (IOException e) {
+            return createStatusJSON("Could not update profile picture", HttpStatus.CONFLICT);
+        }
+    }
+
+    /**
+     * Updates the user's date of birth
+     *
+     * @param payload JSON object containing "userId", "accessToken", "dateOfBirth" fields
+     * @apiNote POST request
+     *
+     * @return JSON object containing boolean. 200 status code iff success
+     */
+    @RequestMapping(path = "/update-date-of-birth",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE,
+        method = RequestMethod.POST)
+    public ResponseEntity<Object> updateDateOfBirth(@RequestBody Map<String, String> payload) {
         DatabaseConnection dbconn = DatabaseConnectionPool.getConnection();
 
 		try {
@@ -477,9 +514,9 @@ public class UserController {
                 return createStatusJSON("Invalid access token", HttpStatus.UNAUTHORIZED);
             }
 
-            String profilePictureUrl = payload.get("profilePictureUrl");
+            String dateOfBirth = payload.get("dateOfBirth");
 
-            return createStatusJSON(dbconn.transaction_updateProfilePicture(userId, profilePictureUrl));
+            return createStatusJSON(dbconn.transaction_updateDateOfBirth(userId, dateOfBirth));
 
         } finally {
             DatabaseConnectionPool.releaseConnection(dbconn);
@@ -490,7 +527,7 @@ public class UserController {
      * Generates a unique user handle from a name
      */
     private String generateUserHandle(DatabaseConnection dbconn, String name) {
-        String userHandle = name.replaceAll("\\s", "") + "#" + String.format("%04d", new Random().nextInt(10000));
+        String userHandle = name.replaceAll("\\s", "").toLowerCase() + "#" + String.format("%04d", new Random().nextInt(10000));
 
         // Check that user handle is unique
         while (dbconn.transaction_resolveUserHandleToUserId(userHandle).getBody() != null) {
