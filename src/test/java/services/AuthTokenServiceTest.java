@@ -8,15 +8,16 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.*;
 import org.junit.rules.*;
-import static org.junit.Assert.*;
 import com.auth0.jwt.*;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import model.*;
-import types.AuthTokens;
+import types.*;
+import model.database.*;
+
+import static org.junit.Assert.*;
 
 public class AuthTokenServiceTest {
 

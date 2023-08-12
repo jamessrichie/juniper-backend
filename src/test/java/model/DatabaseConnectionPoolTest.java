@@ -1,19 +1,19 @@
 package model;
 
 import java.util.*;
+
 import org.junit.*;
 import org.junit.rules.*;
+
+import model.database.*;
+
 import static org.junit.Assert.*;
+import static model.database.DatabaseConnectionPool.*;
 
 public class DatabaseConnectionPoolTest {
 
     @Rule
     public final Timeout globalTimeout = Timeout.seconds(120);
-
-    // DatabaseConnectionPool sizes
-    private final int INITIAL_POOL_SIZE = 5;
-    private final int REDUCED_MAX_POOL_SIZE = 1;
-    private final int MAX_POOL_SIZE = 20;
 
     @BeforeClass
     public static void setUpBeforeClass() {

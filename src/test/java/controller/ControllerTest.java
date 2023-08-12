@@ -7,12 +7,13 @@ import java.util.*;
 import com.google.gson.*;
 import org.junit.*;
 import org.junit.rules.*;
-import static org.junit.Assert.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import model.*;
+import model.database.*;
+
 import static helpers.Utilities.*;
+import static org.junit.Assert.*;
 
 public class ControllerTest {
 
